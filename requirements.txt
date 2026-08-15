@@ -1,0 +1,5 @@
+python-dotenv>=1.0.1
+
+# System dependency, not installable by pip:
+# exiftool 12+ is required. On macOS:
+#   brew install exiftool

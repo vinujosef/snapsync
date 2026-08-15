@@ -18,10 +18,12 @@ Duplicates:
 - detected using SHA-256 hash
 - skipped during copy
 - logged in summary
+- split into files already in the destination and files repeated in the source folder
 
 Filename collisions:
-- preserved
-- collision suffix added
+- preserved with a collision suffix
+- never skipped, because a filename collision means same target filename but different file content
+- never overwritten silently
 
 Example:
 
@@ -36,6 +38,10 @@ Different files can share:
 - timestamps
 - filenames
 - device names
+
+Skipping a filename collision would lose data. A duplicate is safe to skip
+because the SHA-256 hash proves the content is identical. A collision is not
+safe to skip because the hash is different, so SyncSnap keeps both files.
 
 ## Tradeoffs
 

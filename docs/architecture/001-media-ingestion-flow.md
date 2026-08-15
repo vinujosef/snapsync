@@ -46,3 +46,6 @@ All ingestion paths are derived from this destination folder.
 
 ExifTool is required for metadata extraction. If the executable cannot be found,
 startup fails with a clear configuration error.
+
+`--dry-run` can be passed at the command line to audit planned copies without
+editing `.env`.

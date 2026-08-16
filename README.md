@@ -45,10 +45,63 @@ Optional:
 ```env
 FILENAME_PREFIX=
 LOG_LEVEL=INFO
+INFER_TIMEZONE_FROM_IPHONE=true
+CANON_HOME_TIMEZONE=Europe/Helsinki
 IGNORED_FOLDERS=.git,.svn,.hg,__pycache__,@eaDir,System Volume Information,$RECYCLE.BIN
 ```
 
 `VAULT_ROOT` is accepted as a legacy alias for `DESTINATION_FOLDER`.
+
+## Timezone Correction
+
+This handles trips where iPhones switch to the local timezone automatically, but
+a Canon camera keeps using the home timezone.
+
+Example:
+
+- iPhone photos in Spain contain `OffsetTimeOriginal=+01:00`.
+- Canon EOS M50 photos have capture times but no timezone offset.
+- Canon clock is still set to Finland time.
+- SyncSnap can shift Canon-derived filename and folder timestamps so Canon and
+  iPhone photos sort together correctly.
+
+SyncSnap is deliberately conservative:
+
+- It checks iPhone files in the import batch for timezone metadata.
+- It only infers a timezone when the iPhone offsets agree.
+- It uses `CANON_HOME_TIMEZONE` as the timezone the Canon clock was set to.
+- It prints the detected iPhone offset, Canon home timezone, Canon file count,
+  and exact Canon timestamp shift.
+- It applies the Canon correction only if you type `yes`.
+- It never modifies source metadata or source files.
+- If there is no interactive confirmation, Canon timestamps are left unchanged.
+
+Configuration:
+
+```env
+INFER_TIMEZONE_FROM_IPHONE=true
+CANON_HOME_TIMEZONE=Europe/Helsinki
+```
+
+To disable this behavior completely:
+
+```env
+INFER_TIMEZONE_FROM_IPHONE=false
+```
+
+Confirmation prompt example:
+
+```text
+Timezone correction
+-------------------
+Detected iPhone timezone offset: +01:00
+Canon home timezone to assume: Europe/Helsinki
+Canon files without timezone metadata: 42
+Canon filename/folder timestamp shift: -1h
+
+Apply this correction to Canon files for this run?
+Type yes to apply:
+```
 
 ## Usage
 

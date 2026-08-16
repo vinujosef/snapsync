@@ -48,6 +48,8 @@ class Settings:
     allowed_photo_extensions: frozenset[str]
     allowed_video_extensions: frozenset[str]
     ignored_folders: frozenset[str]
+    infer_timezone_from_iphone: bool = True
+    canon_home_timezone: str = "Europe/Helsinki"
 
 
 def get_settings() -> Settings:
@@ -82,6 +84,9 @@ def get_settings() -> Settings:
         ignored_folders=frozenset(
             _parse_csv(os.getenv("IGNORED_FOLDERS"), DEFAULT_IGNORED_FOLDERS)
         ),
+        infer_timezone_from_iphone=_parse_bool(os.getenv("INFER_TIMEZONE_FROM_IPHONE", "true")),
+        canon_home_timezone=os.getenv("CANON_HOME_TIMEZONE", "Europe/Helsinki").strip()
+        or "Europe/Helsinki",
     )
 
 

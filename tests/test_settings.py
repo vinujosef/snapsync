@@ -14,6 +14,8 @@ class SettingsTests(unittest.TestCase):
             "LOG_LEVEL": "warning",
             "EXIFTOOL_PATH": "python3",
             "HASH_LENGTH": "16",
+            "INFER_TIMEZONE_FROM_IPHONE": "false",
+            "CANON_HOME_TIMEZONE": "Europe/Madrid",
         }
 
         with patch.dict(os.environ, env, clear=True):
@@ -23,6 +25,8 @@ class SettingsTests(unittest.TestCase):
         self.assertTrue(settings.dry_run)
         self.assertEqual(settings.log_level, "WARNING")
         self.assertEqual(settings.hash_length, 16)
+        self.assertFalse(settings.infer_timezone_from_iphone)
+        self.assertEqual(settings.canon_home_timezone, "Europe/Madrid")
 
     def test_get_settings_accepts_vault_root_legacy_alias(self):
         env = {

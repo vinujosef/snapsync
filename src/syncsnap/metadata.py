@@ -31,6 +31,7 @@ class Metadata:
     timestamp_field: str
     device_name: str
     quality: str
+    timezone_offset: str | None = None
 
 
 def extract_metadata(path: Path, exiftool_path: str = "exiftool") -> Metadata:
@@ -45,6 +46,7 @@ def extract_metadata(path: Path, exiftool_path: str = "exiftool") -> Metadata:
                     timestamp_field=field,
                     device_name=_extract_device_name(metadata),
                     quality="metadata" if not field.startswith("File") else "filesystem",
+                    timezone_offset=_extract_timezone_offset(metadata),
                 )
 
     stat = path.stat()
@@ -53,6 +55,7 @@ def extract_metadata(path: Path, exiftool_path: str = "exiftool") -> Metadata:
         timestamp_field="FileModifyDate",
         device_name="UnknownDevice",
         quality="filesystem_fallback",
+        timezone_offset=None,
     )
 
 
@@ -62,6 +65,7 @@ def current_date_fallback() -> Metadata:
         timestamp_field="CurrentDate",
         device_name="UnknownDevice",
         quality="current_date_fallback",
+        timezone_offset=None,
     )
 
 
@@ -73,6 +77,9 @@ def _read_exiftool_metadata(path: Path, exiftool_path: str) -> dict[str, object]
         "QuickTimeUTC=1",
         "-DateTimeOriginal",
         "-CreateDate",
+        "-OffsetTime",
+        "-OffsetTimeOriginal",
+        "-OffsetTimeDigitized",
         "-MediaCreateDate",
         "-TrackCreateDate",
         "-FileModifyDate",
@@ -133,3 +140,32 @@ def _extract_device_name(metadata: dict[str, object]) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return "UnknownDevice"
+
+
+def _extract_timezone_offset(metadata: dict[str, object]) -> str | None:
+    for field in ("OffsetTimeOriginal", "OffsetTime", "OffsetTimeDigitized"):
+        value = metadata.get(field)
+        if isinstance(value, str) and _parse_timezone_offset_minutes(value) is not None:
+            return value.strip()
+    return None
+
+
+def parse_timezone_offset_minutes(value: str | None) -> int | None:
+    return _parse_timezone_offset_minutes(value)
+
+
+def _parse_timezone_offset_minutes(value: str | None) -> int | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if len(cleaned) != 6 or cleaned[0] not in {"+", "-"} or cleaned[3] != ":":
+        return None
+    try:
+        hours = int(cleaned[1:3])
+        minutes = int(cleaned[4:6])
+    except ValueError:
+        return None
+    if hours > 23 or minutes > 59:
+        return None
+    sign = 1 if cleaned[0] == "+" else -1
+    return sign * ((hours * 60) + minutes)

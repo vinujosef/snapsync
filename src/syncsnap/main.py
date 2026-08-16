@@ -21,6 +21,11 @@ from syncsnap.reports import DuplicateGroup, write_duplicate_groups_report
 from syncsnap.renamer import generate_filename
 from syncsnap.scanner import scan_source
 from syncsnap.summary import RunSummary
+from syncsnap.timezone_correction import (
+    apply_timezone_correction,
+    build_timezone_correction_plan,
+    describe_shift,
+)
 from syncsnap.util import logger
 from syncsnap.util.paths import build_destination_path
 
@@ -57,6 +62,11 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
     try:
         candidates = scan_source(source_folder, settings)
         summary.source_files_found = len(candidates)
+        metadata_by_path = {path: _safe_metadata(path, settings) for path in candidates}
+        timezone_plan = build_timezone_correction_plan(metadata_by_path, settings)
+        if timezone_plan and not _confirm_timezone_correction(timezone_plan):
+            logger.warning("Canon timezone correction was not confirmed; Canon timestamps are unchanged")
+            timezone_plan = None
         hash_index = build_hash_index(settings.destination_folder)
         run_hash_index: dict[str, Path] = {}
         run_destination_index: dict[str, Path] = {}
@@ -77,10 +87,11 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
             else:
                 summary.media_files_processed += 1
 
-            metadata = _safe_metadata(source_path, settings)
+            metadata = metadata_by_path[source_path]
+            selected_datetime = apply_timezone_correction(metadata, timezone_plan)
             file_hash = calculate_hash(source_path)
             filename = generate_filename(
-                metadata.selected_datetime,
+                selected_datetime,
                 metadata.device_name,
                 file_hash,
                 source_path,
@@ -89,7 +100,7 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
             )
             target_path = build_destination_path(
                 settings,
-                metadata.selected_datetime,
+                selected_datetime,
                 media_type,
                 filename,
             )
@@ -177,6 +188,23 @@ def _confirm_interactive_run(source_folder: Path, settings: Settings) -> bool:
     print("q. Quit")
     choice = input("> ").strip().lower()
     return choice == "1"
+
+
+def _confirm_timezone_correction(timezone_plan) -> bool:
+    print("")
+    print("Timezone correction")
+    print("-------------------")
+    print(f"Detected iPhone timezone offset: {timezone_plan.iphone_offset}")
+    print(f"Canon home timezone to assume: {timezone_plan.canon_home_timezone}")
+    print(f"Canon files without timezone metadata: {len(timezone_plan.canon_files)}")
+    print(f"Canon filename/folder timestamp shift: {describe_shift(timezone_plan.canon_shift_minutes)}")
+    print("")
+    print("Apply this correction to Canon files for this run?")
+    if not sys.stdin.isatty():
+        print("No interactive confirmation available; skipping Canon timezone correction.")
+        return False
+    choice = input("Type yes to apply: ").strip().lower()
+    return choice == "yes"
 
 
 if __name__ == "__main__":

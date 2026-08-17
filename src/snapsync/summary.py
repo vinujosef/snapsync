@@ -68,7 +68,7 @@ class RunSummary:
             )
 
         print("")
-        print(f"{BOLD}{BLUE}SyncSnap Summary{RESET}")
+        print(f"{BOLD}{BLUE}SnapSync Summary{RESET}")
         for index, (title, rows) in enumerate(sections, start=1):
             self._print_section(index, title, rows)
 

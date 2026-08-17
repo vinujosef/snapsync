@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 import unittest
 
-from syncsnap.renamer import generate_filename, sanitize_device_name, sanitize_prefix
+from snapsync.renamer import generate_filename, sanitize_device_name, sanitize_prefix
 
 
 class RenamerTests(unittest.TestCase):

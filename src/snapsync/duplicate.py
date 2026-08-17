@@ -103,7 +103,7 @@ def collision_path(target_path: Path) -> Path:
 
 
 def _is_system_file(path: Path) -> bool:
-    if "_syncsnap_reports" in path.parts:
+    if "_snapsync_reports" in path.parts:
         return True
     if path.name.startswith("."):
         return True

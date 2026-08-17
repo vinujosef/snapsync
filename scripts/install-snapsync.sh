@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COMMAND_NAME="${COMMAND_NAME:-syncsnap}"
+COMMAND_NAME="${COMMAND_NAME:-snapsync}"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 SKIP_DEPS="${SKIP_DEPS:-false}"
 
@@ -11,13 +11,13 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-MAIN_FILE="${PROJECT_ROOT}/src/syncsnap/main.py"
+MAIN_FILE="${PROJECT_ROOT}/src/snapsync/main.py"
 VENV_PYTHON="${PROJECT_ROOT}/.venv/bin/python"
 PYTHON_BIN="python3"
 TARGET="${INSTALL_DIR}/${COMMAND_NAME}"
 
 if [[ ! -f "${MAIN_FILE}" ]]; then
-  echo "Could not find SyncSnap main file at: ${MAIN_FILE}" >&2
+  echo "Could not find SnapSync main file at: ${MAIN_FILE}" >&2
   exit 1
 fi
 

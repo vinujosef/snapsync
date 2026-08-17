@@ -6,8 +6,8 @@ import hashlib
 import unittest
 
 from config.settings import Settings
-from syncsnap.main import run_timezone_repair
-from syncsnap.metadata import Metadata
+from snapsync.main import run_timezone_repair
+from snapsync.metadata import Metadata
 
 
 class TimezoneRepairTests(unittest.TestCase):
@@ -38,7 +38,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 )
 
             with (
-                patch("syncsnap.main._safe_metadata", side_effect=fake_metadata),
+                patch("snapsync.main._safe_metadata", side_effect=fake_metadata),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="yes"),
                 patch("builtins.print"),
@@ -78,7 +78,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 )
 
             with (
-                patch("syncsnap.main._safe_metadata", side_effect=fake_metadata),
+                patch("snapsync.main._safe_metadata", side_effect=fake_metadata),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="no"),
                 patch("builtins.print"),
@@ -118,7 +118,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 )
 
             with (
-                patch("syncsnap.main._safe_metadata", side_effect=fake_metadata),
+                patch("snapsync.main._safe_metadata", side_effect=fake_metadata),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="yes"),
                 patch("builtins.print"),
@@ -159,7 +159,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 )
 
             with (
-                patch("syncsnap.main._safe_metadata", side_effect=fake_metadata),
+                patch("snapsync.main._safe_metadata", side_effect=fake_metadata),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="no"),
                 patch("builtins.print"),
@@ -199,7 +199,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 )
 
             with (
-                patch("syncsnap.main._safe_metadata", side_effect=fake_metadata),
+                patch("snapsync.main._safe_metadata", side_effect=fake_metadata),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="yes"),
                 patch("builtins.print"),
@@ -231,7 +231,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 )
 
             with (
-                patch("syncsnap.main._safe_metadata", side_effect=fake_metadata),
+                patch("snapsync.main._safe_metadata", side_effect=fake_metadata),
                 patch("builtins.print") as mocked_print,
             ):
                 run_timezone_repair(root, settings)
@@ -266,10 +266,10 @@ class TimezoneRepairTests(unittest.TestCase):
                 )
 
             with (
-                patch("syncsnap.main._safe_metadata", side_effect=fake_metadata),
+                patch("snapsync.main._safe_metadata", side_effect=fake_metadata),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="yes"),
-                patch("syncsnap.main.logger.info") as mocked_info,
+                patch("snapsync.main.logger.info") as mocked_info,
                 patch("builtins.print"),
             ):
                 run_timezone_repair(root, settings)
@@ -297,8 +297,8 @@ class TimezoneRepairTests(unittest.TestCase):
                 )
 
             with (
-                patch("syncsnap.main._safe_metadata", side_effect=fake_metadata),
-                patch("syncsnap.main.logger.info") as mocked_info,
+                patch("snapsync.main._safe_metadata", side_effect=fake_metadata),
+                patch("snapsync.main.logger.info") as mocked_info,
                 patch("builtins.print") as mocked_print,
             ):
                 exit_code = run_timezone_repair(root, settings)

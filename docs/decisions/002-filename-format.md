@@ -38,7 +38,7 @@ Prefix_YYYY-MM-DD_HHMMSS_DeviceName_Hash12.ext
 Example:
 
 2026-05-18_142211_iPhone15Pro_a8f31c9e71d4.jpg
-zSyncSnapTestFolder2026May_2026-05-18_142211_iPhone15Pro_a8f31c9e71d4.jpg
+zSnapSyncTestFolder2026May_2026-05-18_142211_iPhone15Pro_a8f31c9e71d4.jpg
 
 `HASH_LENGTH` is configurable between 8 and 64. The default is 12 for a better
 full-scale safety margin while keeping filenames readable.

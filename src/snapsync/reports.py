@@ -26,7 +26,7 @@ def write_duplicate_groups_report(
     if not groups:
         return None
 
-    reports_folder = settings.destination_folder / "_syncsnap_reports"
+    reports_folder = settings.destination_folder / "_snapsync_reports"
     reports_folder.mkdir(parents=True, exist_ok=True)
     report_path = reports_folder / f"{run_started_at.strftime('%Y%m%d_%H%M%S')}_duplicate_groups.csv"
 

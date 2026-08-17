@@ -1,4 +1,4 @@
-# SyncSnap MVP Roadmap
+# SnapSync MVP Roadmap
 
 ## Phase 1
 

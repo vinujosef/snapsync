@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from syncsnap.duplicate import build_hash_index, calculate_hash, decide_destination
+from snapsync.duplicate import build_hash_index, calculate_hash, decide_destination
 
 
 class DuplicateTests(unittest.TestCase):
@@ -12,7 +12,7 @@ class DuplicateTests(unittest.TestCase):
             media = root / "photo.jpg"
             media.write_bytes(b"media")
             (root / ".DS_Store").write_bytes(b"finder")
-            reports = root / "_syncsnap_reports"
+            reports = root / "_snapsync_reports"
             reports.mkdir()
             (reports / "duplicate_groups.csv").write_bytes(b"report")
 

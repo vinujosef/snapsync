@@ -3,8 +3,8 @@ from pathlib import Path
 import unittest
 
 from config.settings import Settings
-from syncsnap.metadata import Metadata
-from syncsnap.timezone_correction import (
+from snapsync.metadata import Metadata
+from snapsync.timezone_correction import (
     apply_timezone_correction,
     build_timezone_correction_plan,
     diagnose_timezone_correction,

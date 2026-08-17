@@ -2,7 +2,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 import unittest
 
-from syncsnap.summary import RunSummary
+from snapsync.summary import RunSummary
 
 
 class SummaryTests(unittest.TestCase):

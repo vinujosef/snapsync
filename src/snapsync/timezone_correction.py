@@ -9,7 +9,7 @@ import random
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from config.settings import Settings
-from syncsnap.metadata import Metadata, parse_timezone_offset_minutes
+from snapsync.metadata import Metadata, parse_timezone_offset_minutes
 
 
 @dataclass(frozen=True)

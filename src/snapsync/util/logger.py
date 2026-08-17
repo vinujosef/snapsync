@@ -1,4 +1,4 @@
-# Provide small colored console logging for SyncSnap.
+# Provide small colored console logging for SnapSync.
 from __future__ import annotations
 
 import sys

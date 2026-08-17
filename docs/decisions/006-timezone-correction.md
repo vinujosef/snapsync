@@ -11,7 +11,7 @@ folders that sort one hour apart.
 
 ## Final Choice
 
-SyncSnap may infer the destination timezone from iPhone photo metadata, then
+SnapSync may infer the destination timezone from iPhone photo metadata, then
 apply a Canon timestamp correction only after explicit confirmation.
 
 During copy, the correction affects generated filenames and destination folders.
@@ -51,7 +51,7 @@ offset between places depending on the capture date.
 
 Using an IANA timezone such as `Europe/Helsinki` lets Python calculate the
 camera's home offset for the photo date, while the iPhone metadata tells
-SyncSnap the destination offset.
+SnapSync the destination offset.
 
 ## Tradeoffs
 

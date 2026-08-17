@@ -1,4 +1,4 @@
-# Load and validate SyncSnap settings from .env.
+# Load and validate SnapSync settings from .env.
 from __future__ import annotations
 
 import os

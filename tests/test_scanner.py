@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from config.settings import Settings
-from syncsnap.scanner import scan_source
+from snapsync.scanner import scan_source
 
 
 class ScannerTests(unittest.TestCase):

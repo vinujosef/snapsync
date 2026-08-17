@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 
 from config.settings import Settings
-from syncsnap.util.paths import build_destination_folder, build_destination_path
+from snapsync.util.paths import build_destination_folder, build_destination_path
 
 
 class PathTests(unittest.TestCase):

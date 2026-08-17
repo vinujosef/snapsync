@@ -1,6 +1,6 @@
-# SyncSnap
+# SnapSync
 
-SyncSnap is a local photo/video ingestion tool.
+SnapSync is a local photo/video ingestion tool.
 
 It scans a source folder, reads metadata with ExifTool, copies media into a
 structured destination folder, normalizes filenames, skips exact duplicates,
@@ -19,11 +19,11 @@ preserves filename conflicts, and prints a run summary.
 
 ```bash
 brew install exiftool
-./scripts/install-syncsnap.sh --user
+./scripts/install-snapsync.sh --user
 ```
 
 The installer creates `.venv`, installs `requirements.txt`, and creates the
-`syncsnap` command. If using `--user`, make sure this is on your `PATH`:
+`snapsync` command. If using `--user`, make sure this is on your `PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -31,7 +31,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## Configuration
 
-SyncSnap reads `.env`.
+SnapSync reads `.env`.
 
 ```env
 DESTINATION_FOLDER=/path/to/destination
@@ -62,10 +62,10 @@ Example:
 - iPhone photos in Spain contain `OffsetTimeOriginal=+01:00`.
 - Canon EOS M50 photos have capture times but no timezone offset.
 - Canon clock is still set to Finland time.
-- SyncSnap can shift Canon-derived filename and folder timestamps so Canon and
+- SnapSync can shift Canon-derived filename and folder timestamps so Canon and
   iPhone photos sort together correctly.
 
-SyncSnap is deliberately conservative:
+SnapSync is deliberately conservative:
 
 - It checks iPhone files in the import batch for timezone metadata.
 - It only infers a timezone when the iPhone offsets agree.
@@ -119,10 +119,10 @@ Interactive:
 
 ```bash
 cd "/path/to/source-folder"
-syncsnap
+snapsync
 ```
 
-Run plain `syncsnap` from the folder you want to process to get the action menu.
+Run plain `snapsync` from the folder you want to process to get the action menu.
 Passing a folder path directly keeps the non-interactive copy behavior.
 
 You will be asked to choose:
@@ -145,7 +145,7 @@ For option `2`, the repair target is the folder you are currently in, not
 Audit without copying:
 
 ```bash
-syncsnap --dry-run "/path/to/source-folder"
+snapsync --dry-run "/path/to/source-folder"
 ```
 
 Real copy:
@@ -155,7 +155,7 @@ DRY_RUN=false
 ```
 
 ```bash
-syncsnap "/path/to/source-folder"
+snapsync "/path/to/source-folder"
 ```
 
 For large real runs, consider:
@@ -193,10 +193,10 @@ If `FILENAME_PREFIX` is set, it is prepended to the filename.
 
 ## Reports
 
-If repeated files are found inside the source folder, SyncSnap writes:
+If repeated files are found inside the source folder, SnapSync writes:
 
 ```text
-DESTINATION_FOLDER/_syncsnap_reports/*_duplicate_groups.csv
+DESTINATION_FOLDER/_snapsync_reports/*_duplicate_groups.csv
 ```
 
 The report shows which source file was kept and which repeated source files

@@ -5,7 +5,7 @@ import csv
 import unittest
 
 from config.settings import Settings
-from syncsnap.reports import DuplicateGroup, write_duplicate_groups_report
+from snapsync.reports import DuplicateGroup, write_duplicate_groups_report
 
 
 class ReportTests(unittest.TestCase):
@@ -39,7 +39,7 @@ class ReportTests(unittest.TestCase):
 
             self.assertEqual(
                 report_path,
-                Path(temp_dir) / "_syncsnap_reports" / "20260519_143000_duplicate_groups.csv",
+                Path(temp_dir) / "_snapsync_reports" / "20260519_143000_duplicate_groups.csv",
             )
             with report_path.open(newline="", encoding="utf-8") as report_file:
                 rows = list(csv.DictReader(report_file))

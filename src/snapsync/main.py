@@ -1,4 +1,4 @@
-# Coordinate the SyncSnap command-line ingestion flow.
+# Coordinate the SnapSync command-line ingestion flow.
 from __future__ import annotations
 
 import argparse
@@ -15,23 +15,23 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(project_root / "src"))
 
 from config.settings import Settings, get_settings
-from syncsnap.classifier import UNKNOWN, classify
-from syncsnap.copier import copy_file
-from syncsnap.duplicate import build_hash_index, calculate_hash, collision_path, decide_destination
-from syncsnap.metadata import Metadata, current_date_fallback, extract_metadata
-from syncsnap.reports import DuplicateGroup, write_duplicate_groups_report
-from syncsnap.renamer import generate_filename
-from syncsnap.scanner import scan_source
-from syncsnap.summary import RunSummary
-from syncsnap.timezone_correction import (
+from snapsync.classifier import UNKNOWN, classify
+from snapsync.copier import copy_file
+from snapsync.duplicate import build_hash_index, calculate_hash, collision_path, decide_destination
+from snapsync.metadata import Metadata, current_date_fallback, extract_metadata
+from snapsync.reports import DuplicateGroup, write_duplicate_groups_report
+from snapsync.renamer import generate_filename
+from snapsync.scanner import scan_source
+from snapsync.summary import RunSummary
+from snapsync.timezone_correction import (
     TimezoneCorrectionPlan,
     apply_timezone_correction,
     build_timezone_correction_plan,
     diagnose_timezone_correction,
     describe_shift,
 )
-from syncsnap.util import logger
-from syncsnap.util.paths import build_destination_path
+from snapsync.util import logger
+from snapsync.util.paths import build_destination_path
 
 
 RESET = "\033[0m"
@@ -41,7 +41,7 @@ CYAN = "\033[36m"
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Copy media into a SyncSnap destination folder.")
+    parser = argparse.ArgumentParser(description="Copy media into a SnapSync destination folder.")
     parser.add_argument("--dry-run", action="store_true", help="Audit planned work without copying files")
     parser.add_argument("source_folder", nargs="?", help="Folder to scan recursively")
     args = parser.parse_args(argv)
@@ -373,7 +373,7 @@ def _stable_shuffled_paths(paths: list[Path]) -> list[Path]:
 
 def _choose_interactive_action(source_folder: Path, settings: Settings) -> str:
     print(f"{BLUE}================{RESET}")
-    print(f"{BOLD}{BLUE} 🎞️ SyncSnap 📤{RESET}")
+    print(f"{BOLD}{BLUE} 🎞️ SnapSync 📤{RESET}")
     print(f"{BLUE}================{RESET}")
     print()
     print(f"{BOLD}{CYAN}Choose an action:{RESET}")
@@ -480,7 +480,7 @@ class _TimezoneRepairNoopSummary:
 def _timezone_repair_noop_summary(reason: str) -> _TimezoneRepairNoopSummary:
     # These messages are shown when option 2 has nothing to rename:
     # no Canon files means there are no repair targets; no iPhone timezone means
-    # SyncSnap cannot know the local trip timezone; mixed iPhone timezones need
+    # SnapSync cannot know the local trip timezone; mixed iPhone timezones need
     # the earlier user confirmation; invalid Canon home timezone means the
     # configured fallback cannot be used; already-matching files need no change.
     if reason == "No iPhone timezone offsets were found":

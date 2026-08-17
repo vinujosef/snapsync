@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The SyncSnap destination folder is the long-term storage location for copied photo and video originals.
+The SnapSync destination folder is the long-term storage location for copied photo and video originals.
 
 The destination folder must stay predictable, human-readable, and safe to back up.
 

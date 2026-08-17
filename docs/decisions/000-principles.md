@@ -1,8 +1,8 @@
-# Decision 0000 - SyncSnap Principles
+# Decision 0000 - SnapSync Principles
 
 ## Problem
 
-SyncSnap needs clear rules before any code is written, because media storage decisions are hard to reverse once thousands of files are processed.
+SnapSync needs clear rules before any code is written, because media storage decisions are hard to reverse once thousands of files are processed.
 
 ## Principles
 
@@ -22,7 +22,7 @@ SyncSnap needs clear rules before any code is written, because media storage dec
 
 ## Final Choice
 
-SyncSnap will treat the destination folder as a long-term archive, not a temporary sync folder.
+SnapSync will treat the destination folder as a long-term archive, not a temporary sync folder.
 
 ## Tradeoffs
 

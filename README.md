@@ -69,12 +69,22 @@ SyncSnap is deliberately conservative:
 
 - It checks iPhone files in the import batch for timezone metadata.
 - It only infers a timezone when the iPhone offsets agree.
-- It uses `CANON_HOME_TIMEZONE` as the timezone the Canon clock was set to.
+- It compares Canon timezone metadata to the iPhone timezone when Canon provides
+  a timezone.
+- It uses `CANON_HOME_TIMEZONE` only as a fallback when Canon timezone metadata
+  is missing.
 - It prints the detected iPhone offset, Canon home timezone, Canon file count,
   and exact Canon timestamp shift.
 - It applies the Canon correction only if you type `yes`.
 - It never modifies source metadata or source files.
 - If there is no interactive confirmation, Canon timestamps are left unchanged.
+
+The same confirmation rule applies to both timezone-aware actions:
+
+- Copy action: corrected Canon time is used for the destination folder and
+  filename.
+- Repair action: corrected Canon time is used to rename existing Canon files
+  inside the current folder tree.
 
 Configuration:
 
@@ -111,6 +121,26 @@ Interactive:
 cd "/path/to/source-folder"
 syncsnap
 ```
+
+Run plain `syncsnap` from the folder you want to process to get the action menu.
+Passing a folder path directly keeps the non-interactive copy behavior.
+
+You will be asked to choose:
+
+```text
+1. Media copy + filename fix
+2. Fix Canon timezone issue in this folder
+q. Quit
+```
+
+Option `1` copies media into `DESTINATION_FOLDER`.
+
+Option `2` recursively scans the current folder and renames affected Canon
+files in place. It does not copy files, move files to another root, or edit
+embedded metadata.
+
+For option `2`, the repair target is the folder you are currently in, not
+`DESTINATION_FOLDER`.
 
 Audit without copying:
 

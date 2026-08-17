@@ -14,19 +14,28 @@ folders that sort one hour apart.
 SyncSnap may infer the destination timezone from iPhone photo metadata, then
 apply a Canon timestamp correction only after explicit confirmation.
 
-The correction affects generated filenames and destination folders only. It does
-not edit source files or embedded metadata.
+During copy, the correction affects generated filenames and destination folders.
+During timezone repair, the correction renames existing Canon files in the
+current folder tree.
+
+The correction does not edit embedded metadata.
 
 ## Rules
 
 - Read iPhone timezone offsets such as `OffsetTimeOriginal`.
 - Infer a timezone only when the iPhone offsets in the batch agree.
-- Treat Canon files without timezone metadata as candidates for correction.
-- Use `CANON_HOME_TIMEZONE` as the timezone the Canon clock was set to.
+- Treat Canon files as candidates when their effective timezone differs from the
+  inferred iPhone timezone.
+- Use Canon timezone metadata when Canon provides it.
+- Use `CANON_HOME_TIMEZONE` only as a fallback when Canon timezone metadata is
+  missing.
 - Print the detected iPhone offset, Canon home timezone, Canon file count, and
   exact timestamp shift before applying anything.
 - Require the user to type `yes`.
 - If confirmation is unavailable or not given, leave Canon timestamps unchanged.
+- Offer timezone repair as a separate interactive action.
+- Repair recursively scans the current folder and renames Canon files in place.
+- Repair does not copy files to `DESTINATION_FOLDER`.
 
 ## Configuration
 

@@ -25,11 +25,17 @@ class RunSummary:
     duplicates_repeated_in_source: int = 0
     filename_collisions_handled: int = 0
     unknown_files: int = 0
+    canon_files_found: int = 0
     errors: int = 0
     duplicate_groups_report: Path | None = None
     audit_mode: bool = False
+    action_label: str = "copy"
 
     def print(self) -> None:
+        if self.action_label == "rename":
+            self._print_timezone_repair_summary()
+            return
+
         sections = [
             (
                 "Scanned",
@@ -68,10 +74,11 @@ class RunSummary:
 
     def _result_rows(self) -> list[tuple[str, int, str]]:
         rows = []
+        action = "rename" if self.action_label == "rename" else "copy"
         if self.audit_mode:
-            rows.append(("Will copy", self.planned_copies, GREEN))
+            rows.append((f"Will {action}", self.planned_copies, GREEN))
         else:
-            rows.append(("Copied", self.copied_files, GREEN))
+            rows.append(("Renamed" if action == "rename" else "Copied", self.copied_files, GREEN))
         rows.append(("Skipped duplicates", self.duplicate_files_skipped, YELLOW))
         rows.append(("Skipped unknown", self.unknown_files, YELLOW))
         rows.append(("Errors", self.errors, RED if self.errors else GREEN))
@@ -99,3 +106,14 @@ class RunSummary:
                 f"{color}{str(value).rjust(value_width)}{RESET} |"
             )
         print(border)
+
+    def _print_timezone_repair_summary(self) -> None:
+        renamed = self.planned_copies if self.audit_mode else self.copied_files
+        print("")
+        print(f"{BOLD}{BLUE}Timezone Repair Summary{RESET}")
+        print(f"{BLUE}-----------------------{RESET}")
+        print(f"Files scanned: {self.source_files_found}")
+        print(f"Canon files found: {self.canon_files_found}")
+        print(f"Canon files renamed: {renamed}")
+        print(f"Skipped: {self.duplicate_files_skipped}")
+        print(f"Errors: {self.errors}")

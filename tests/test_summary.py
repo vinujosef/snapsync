@@ -9,9 +9,9 @@ class SummaryTests(unittest.TestCase):
     def test_timezone_repair_summary_is_compact(self):
         summary = RunSummary(
             source_files_found=689,
-            copied_files=240,
+            files_renamed=240,
             duplicate_files_skipped=0,
-            canon_files_found=240,
+            files_to_rename=240,
             errors=0,
             action_label="rename",
         )

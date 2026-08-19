@@ -1,4 +1,4 @@
-# Choose and run the SnapSync command-line action.
+# Choose and run the snapsync command-line action.
 from __future__ import annotations
 
 import argparse
@@ -15,6 +15,7 @@ from config.settings import get_settings
 from snapsync.actions.copy_media import run_media_copy
 from snapsync.actions.repair_timezone import run_timezone_repair
 from snapsync.cli import choose_interactive_action, print_action_context
+from snapsync.constants import ACTION_COPY, ACTION_QUIT, ACTION_REPAIR_TIMEZONE
 from snapsync.util import logger
 
 
@@ -34,21 +35,21 @@ def main(argv: list[str] | None = None) -> int:
         logger.error(str(exc))
         return 2
 
-    action = "copy"
+    action = ACTION_COPY
     if not args.source_folder:
         action = choose_interactive_action()
-        if action == "quit":
+        if action == ACTION_QUIT:
             logger.info("No action selected")
             return 0
         print_action_context(action, source_folder, settings)
 
-    if action == "repair_timezone":
+    if action == ACTION_REPAIR_TIMEZONE:
         return run_timezone_repair(source_folder, settings)
     return run_media_copy(source_folder, settings)
 
 
 def _parse_args(argv: list[str] | None):
-    parser = argparse.ArgumentParser(description="Copy media into a SnapSync destination folder.")
+    parser = argparse.ArgumentParser(description="Copy media into a snapsync destination folder.")
     parser.add_argument("--dry-run", action="store_true", help="Audit planned work without copying files")
     parser.add_argument("source_folder", nargs="?", help="Folder to scan recursively")
     return parser.parse_args(argv)

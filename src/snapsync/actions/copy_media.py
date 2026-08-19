@@ -1,4 +1,4 @@
-# Copy media into the configured SnapSync destination folder.
+# Copy media into the configured snapsync destination folder.
 from __future__ import annotations
 
 from datetime import datetime
@@ -9,7 +9,7 @@ from snapsync.classifier import UNKNOWN, classify
 from snapsync.cli import confirm_timezone_correction
 from snapsync.copier import copy_file
 from snapsync.duplicate import build_hash_index, calculate_hash, decide_destination
-from snapsync.metadata import current_date_fallback, extract_metadata
+from snapsync.metadata_reader import read_metadata_or_fallback
 from snapsync.reports import DuplicateGroup, write_duplicate_groups_report
 from snapsync.renamer import generate_filename
 from snapsync.scanner import scan_source
@@ -26,7 +26,10 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
     try:
         candidates = scan_source(source_folder, settings)
         summary.source_files_found = len(candidates)
-        metadata_by_path = {path: _safe_metadata(path, settings) for path in candidates}
+        metadata_by_path = {
+            path: read_metadata_or_fallback(path, settings)
+            for path in candidates
+        }
         timezone_plan = build_timezone_correction_plan(metadata_by_path, settings)
         if timezone_plan and not confirm_timezone_correction(timezone_plan):
             logger.warning("Canon timezone correction was not confirmed; Canon timestamps are unchanged")
@@ -101,17 +104,6 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
     _write_duplicate_report(settings, duplicate_groups, run_started_at, summary)
     summary.print()
     return 0 if summary.errors == 0 else 1
-
-
-def _safe_metadata(path: Path, settings: Settings):
-    try:
-        return extract_metadata(path, settings.exiftool_path)
-    except Exception as exc:
-        logger.warning(f"Metadata fallback for {path}: {exc}")
-        try:
-            return current_date_fallback()
-        except Exception:
-            raise exc
 
 
 def _record_skipped_duplicate(

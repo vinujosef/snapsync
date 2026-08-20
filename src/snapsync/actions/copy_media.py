@@ -91,6 +91,7 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
             else:
                 summary.copied_files += 1
                 logger.success(f"Copied {source_path} -> {decision.destination}")
+            summary.record_output_folder(media_type, decision.destination)
             if decision.collision:
                 summary.filename_collisions_handled += 1
                 logger.warning(f"Collision handled for {source_path}: {decision.destination}")

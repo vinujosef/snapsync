@@ -1,7 +1,7 @@
 # Track counters and print the final run summary.
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -29,8 +29,12 @@ class RunSummary:
     files_renamed: int = 0
     errors: int = 0
     duplicate_groups_report: Path | None = None
+    output_folders: dict[str, set[Path]] = field(default_factory=dict)
     audit_mode: bool = False
     action_label: str = "copy"
+
+    def record_output_folder(self, media_type: str, destination: Path) -> None:
+        self.output_folders.setdefault(media_type, set()).add(destination.parent)
 
     def print(self) -> None:
         if self.action_label == "rename":
@@ -72,6 +76,7 @@ class RunSummary:
         print(f"{BOLD}{BLUE}snapsync Summary{RESET}")
         for index, (title, rows) in enumerate(sections, start=1):
             self._print_section(index, title, rows)
+        self._print_output_folders()
 
     def _result_rows(self) -> list[tuple[str, int, str]]:
         rows = []
@@ -117,3 +122,31 @@ class RunSummary:
         print(f"Canon files renamed: {self.files_renamed}")
         print(f"Skipped: {self.duplicate_files_skipped}")
         print(f"Errors: {self.errors}")
+
+    def _print_output_folders(self) -> None:
+        if not self.output_folders:
+            return
+
+        file_count = self.planned_copies if self.audit_mode else self.copied_files
+        action = "would be written to" if self.audit_mode else "written to"
+        noun = "file" if file_count == 1 else "files"
+        print("")
+        print(f"{file_count} {noun} {action}:")
+
+        for media_type in ("photo", "video", "unknown"):
+            folders = self.output_folders.get(media_type)
+            if not folders:
+                continue
+            print("")
+            print(f"({_media_type_label(media_type)})")
+            for folder in sorted(folders):
+                print(f"{folder}/")
+
+
+def _media_type_label(media_type: str) -> str:
+    labels = {
+        "photo": "📸 photo",
+        "video": "📹 video",
+        "unknown": "unknown",
+    }
+    return labels.get(media_type, media_type)

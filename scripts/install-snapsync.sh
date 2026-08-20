@@ -59,16 +59,25 @@ SH
 
 chmod +x "${TARGET}"
 
+echo ""
+echo "----------------------------------------------------------------------------"
 echo "Installed ${COMMAND_NAME} -> ${TARGET}"
 echo "Python: ${PYTHON_BIN}"
-echo ""
-echo "Try it from any media folder:"
-echo "  cd \"/path/to/source/folder\""
-echo "  ${COMMAND_NAME}"
+echo "----------------------------------------------------------------------------"
+echo "Run snapsync From Any Media Folder:"
+echo "cd \"/path/to/source/folder\" -> Run ${COMMAND_NAME}"
+echo "----------------------------------------------------------------------------"
 
 if [[ ":${PATH}:" != *":${INSTALL_DIR}:"* ]]; then
   echo ""
   echo "Note: ${INSTALL_DIR} is not currently on PATH."
   echo "Add this to your shell config if needed:"
   echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+  if [[ "${INSTALL_DIR}" == "${HOME}/.local/bin" && "${SHELL:-}" == */zsh ]]; then
+    echo ""
+    echo "For zsh, you can add it permanently with:"
+    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+    echo "  source ~/.zshrc"
+    echo "  rehash"
+  fi
 fi

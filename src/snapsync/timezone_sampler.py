@@ -29,9 +29,15 @@ def collect_repair_metadata(candidates: list[Path], settings: Settings) -> dict[
 
     remaining_paths = [path for path in candidates if path not in metadata_by_path]
     if likely_canon_paths:
-        _read_until_iphone_sample_is_full(remaining_paths, settings, metadata_by_path, progress)
+        _read_paths(
+            remaining_paths,
+            settings,
+            metadata_by_path,
+            progress,
+            stop_when_iphone_sample_is_full=True,
+        )
     else:
-        _read_all_but_extra_iphones(remaining_paths, settings, metadata_by_path, progress)
+        _read_paths(remaining_paths, settings, metadata_by_path, progress)
 
     return metadata_by_path
 
@@ -64,30 +70,20 @@ def sampled_iphone_offsets(metadata_by_path: dict[Path, Metadata]) -> list[str]:
     ][:IPHONE_SAMPLE_SIZE]
 
 
-def _read_until_iphone_sample_is_full(
+def _read_paths(
     paths: list[Path],
     settings: Settings,
     metadata_by_path: dict[Path, Metadata],
     progress: ProgressHeartbeat,
+    *,
+    stop_when_iphone_sample_is_full: bool = False,
 ) -> None:
     for path in _stable_shuffle(paths):
         if _looks_like_iphone(path) and len(sampled_iphone_offsets(metadata_by_path)) >= IPHONE_SAMPLE_SIZE:
             continue
         _read_one(path, settings, metadata_by_path, progress)
-        if len(sampled_iphone_offsets(metadata_by_path)) >= IPHONE_SAMPLE_SIZE:
+        if stop_when_iphone_sample_is_full and len(sampled_iphone_offsets(metadata_by_path)) >= IPHONE_SAMPLE_SIZE:
             break
-
-
-def _read_all_but_extra_iphones(
-    paths: list[Path],
-    settings: Settings,
-    metadata_by_path: dict[Path, Metadata],
-    progress: ProgressHeartbeat,
-) -> None:
-    for path in _stable_shuffle(paths):
-        if _looks_like_iphone(path) and len(sampled_iphone_offsets(metadata_by_path)) >= IPHONE_SAMPLE_SIZE:
-            continue
-        _read_one(path, settings, metadata_by_path, progress)
 
 
 def _read_one(

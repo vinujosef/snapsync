@@ -21,12 +21,12 @@ CYAN = "\033[36m"
 
 
 def choose_interactive_action() -> str:
-    print(f"{BLUE}================{RESET}")
-    print(f"{BOLD}{BLUE} 🎞️ snapsync 📤{RESET}")
-    print(f"{BLUE}================{RESET}")
+    print(blue("================"))
+    print(blue(" 🎞️ snapsync 📤", bold=True))
+    print(blue("================"))
     print()
-    print(f"{BOLD}{CYAN}Choose an action:{RESET}")
-    print(f"{CYAN}-----------------{RESET}")
+    print(cyan("Choose an action:", bold=True))
+    print(cyan("-----------------"))
     print("1️⃣  Media copy + filename fix")
     print("2️⃣  Fix Canon timezone issue in this folder")
     print("q. Quit")
@@ -96,8 +96,21 @@ class ProgressHeartbeat:
 
 
 def _print_action_heading(title: str) -> None:
-    print(f"{BOLD}{CYAN}{title}{RESET}")
-    print(f"{CYAN}{'-' * len(title)}{RESET}")
+    print(cyan(title, bold=True))
+    print(cyan("-" * len(title)))
+
+
+def blue(text: str, *, bold: bool = False) -> str:
+    return _color(text, BLUE, bold)
+
+
+def cyan(text: str, *, bold: bool = False) -> str:
+    return _color(text, CYAN, bold)
+
+
+def _color(text: str, color: str, bold: bool) -> str:
+    prefix = f"{BOLD}{color}" if bold else color
+    return f"{prefix}{text}{RESET}"
 
 
 def _last_path_parts(path: Path, count: int) -> str:

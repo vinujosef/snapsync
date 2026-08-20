@@ -35,7 +35,12 @@ def run_timezone_repair(source_folder: Path, settings: Settings) -> int:
             summary.print()
             return 0
 
-        timezone_plan = _build_repair_plan(metadata_by_path, settings, iphone_offset)
+        timezone_plan = build_timezone_correction_plan(
+            metadata_by_path,
+            settings,
+            iphone_offset=iphone_offset,
+            force_canon_home_timezone=True,
+        )
         if not timezone_plan:
             print_timezone_repair_skip_message(metadata_by_path, settings)
             summary.print()
@@ -59,19 +64,6 @@ def run_timezone_repair(source_folder: Path, settings: Settings) -> int:
 
     summary.print()
     return 0 if summary.errors == 0 else 1
-
-
-def _build_repair_plan(
-    metadata_by_path: dict[Path, Metadata],
-    settings: Settings,
-    iphone_offset: str | None,
-) -> TimezoneCorrectionPlan | None:
-    return build_timezone_correction_plan(
-        metadata_by_path,
-        settings,
-        iphone_offset=iphone_offset,
-        force_canon_home_timezone=True,
-    )
 
 
 def _repair_one_file(

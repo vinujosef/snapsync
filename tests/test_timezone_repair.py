@@ -22,20 +22,8 @@ class TimezoneRepairTests(unittest.TestCase):
 
             def fake_metadata(path, settings):
                 if path == iphone:
-                    return Metadata(
-                        datetime(2025, 12, 20, 10, 40, 24),
-                        "DateTimeOriginal",
-                        "iPhone 16 Pro",
-                        "metadata",
-                        "+01:00",
-                    )
-                return Metadata(
-                    datetime(2025, 12, 20, 11, 40, 24),
-                    "DateTimeOriginal",
-                    "Canon EOS M50",
-                    "metadata",
-                    None,
-                )
+                    return _iphone_metadata()
+                return _canon_metadata()
 
             with (
                 patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
@@ -62,20 +50,8 @@ class TimezoneRepairTests(unittest.TestCase):
 
             def fake_metadata(path, settings):
                 if path == iphone:
-                    return Metadata(
-                        datetime(2025, 12, 20, 10, 40, 24),
-                        "DateTimeOriginal",
-                        "iPhone 16 Pro",
-                        "metadata",
-                        "+01:00",
-                    )
-                return Metadata(
-                    datetime(2025, 12, 20, 11, 40, 24),
-                    "DateTimeOriginal",
-                    "Canon EOS M50",
-                    "metadata",
-                    None,
-                )
+                    return _iphone_metadata()
+                return _canon_metadata()
 
             with (
                 patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
@@ -102,20 +78,8 @@ class TimezoneRepairTests(unittest.TestCase):
             def fake_metadata(path, settings):
                 metadata_calls.append(path)
                 if "iphone" in path.name.lower():
-                    return Metadata(
-                        datetime(2025, 12, 20, 10, 40, 24),
-                        "DateTimeOriginal",
-                        "iPhone 16 Pro",
-                        "metadata",
-                        "+01:00",
-                    )
-                return Metadata(
-                    datetime(2025, 12, 20, 11, 40, 24),
-                    "DateTimeOriginal",
-                    "Canon EOS M50",
-                    "metadata",
-                    None,
-                )
+                    return _iphone_metadata()
+                return _canon_metadata()
 
             with (
                 patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
@@ -143,20 +107,8 @@ class TimezoneRepairTests(unittest.TestCase):
             def fake_metadata(path, settings):
                 if "iphone" in path.name.lower():
                     offset = "+02:00" if path == iphones[0] else "+01:00"
-                    return Metadata(
-                        datetime(2025, 12, 20, 10, 40, 24),
-                        "DateTimeOriginal",
-                        "iPhone 16 Pro",
-                        "metadata",
-                        offset,
-                    )
-                return Metadata(
-                    datetime(2025, 12, 20, 11, 40, 24),
-                    "DateTimeOriginal",
-                    "Canon EOS M50",
-                    "metadata",
-                    None,
-                )
+                    return _iphone_metadata(offset)
+                return _canon_metadata()
 
             with (
                 patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
@@ -183,20 +135,8 @@ class TimezoneRepairTests(unittest.TestCase):
             def fake_metadata(path, settings):
                 metadata_calls.append(path)
                 if "iphone" in path.name.lower():
-                    return Metadata(
-                        datetime(2025, 12, 20, 10, 40, 24),
-                        "DateTimeOriginal",
-                        "iPhone 16 Pro",
-                        "metadata",
-                        "+01:00",
-                    )
-                return Metadata(
-                    datetime(2025, 12, 20, 11, 40, 24),
-                    "DateTimeOriginal",
-                    "Canon EOS M50",
-                    "metadata",
-                    None,
-                )
+                    return _iphone_metadata()
+                return _canon_metadata()
 
             with (
                 patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
@@ -222,13 +162,7 @@ class TimezoneRepairTests(unittest.TestCase):
             settings = _settings(root, dry_run=True)
 
             def fake_metadata(path, settings):
-                return Metadata(
-                    datetime(2025, 12, 20, 11, 40, 24),
-                    "DateTimeOriginal",
-                    "Canon EOS M50",
-                    "metadata",
-                    None,
-                )
+                return _canon_metadata()
 
             with (
                 patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
@@ -250,20 +184,8 @@ class TimezoneRepairTests(unittest.TestCase):
 
             def fake_metadata(path, settings):
                 if path == iphone:
-                    return Metadata(
-                        datetime(2025, 12, 20, 10, 40, 24),
-                        "DateTimeOriginal",
-                        "iPhone 16 Pro",
-                        "metadata",
-                        "+01:00",
-                    )
-                return Metadata(
-                    datetime(2025, 12, 20, 11, 40, 24),
-                    "DateTimeOriginal",
-                    "Canon EOS M50",
-                    "metadata",
-                    None,
-                )
+                    return _iphone_metadata()
+                return _canon_metadata()
 
             with (
                 patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
@@ -288,13 +210,7 @@ class TimezoneRepairTests(unittest.TestCase):
             settings = _settings(root, dry_run=False)
 
             def fake_metadata(path, settings):
-                return Metadata(
-                    datetime(2025, 12, 20, 10, 40, 24),
-                    "DateTimeOriginal",
-                    "iPhone 16 Pro",
-                    "metadata",
-                    "+01:00",
-                )
+                return _iphone_metadata()
 
             with (
                 patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
@@ -326,6 +242,26 @@ def _settings(root: Path, dry_run: bool) -> Settings:
         allowed_photo_extensions=frozenset({"jpg"}),
         allowed_video_extensions=frozenset({"mov"}),
         ignored_folders=frozenset(),
+    )
+
+
+def _iphone_metadata(offset: str = "+01:00") -> Metadata:
+    return Metadata(
+        datetime(2025, 12, 20, 10, 40, 24),
+        "DateTimeOriginal",
+        "iPhone 16 Pro",
+        "metadata",
+        offset,
+    )
+
+
+def _canon_metadata(offset: str | None = None) -> Metadata:
+    return Metadata(
+        datetime(2025, 12, 20, 11, 40, 24),
+        "DateTimeOriginal",
+        "Canon EOS M50",
+        "metadata",
+        offset,
     )
 
 

@@ -6,126 +6,45 @@ It scans a source folder, reads metadata with ExifTool, copies media into a
 structured destination folder, normalizes filenames, skips exact duplicates,
 preserves filename conflicts, and prints a run summary.
 
+- [Safety](#safety)
+- [Install](#install)
+- [Basic Usage](#basic-usage)
+- [Config](#config)
+- [Where To Read More](#where-to-read-more)
+
 ## Safety
 
 - Copy only, never move.
-- Never modify source files.
-- Detect duplicates with SHA-256 hashes.
-- Skip exact duplicate content.
+- Never modify source files during copy.
+- Skip exact duplicate content using SHA-256 hashes.
 - Preserve filename conflicts with `_collision-01`.
 - Continue after individual file errors.
+- Read metadata with ExifTool in batches, with safe fallbacks for unreadable files.
+- Apply Canon timezone correction only after you type `yes`.
 
-## Setup
+## Install
 
 ```bash
 brew install exiftool
 ./scripts/install-snapsync.sh --user
 ```
 
-The installer creates `.venv`, installs `requirements.txt`, and creates the
-`snapsync` command. If using `--user`, make sure this is on your `PATH`:
+If using `--user`, make sure this is on your `PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## Configuration
+## Basic Usage
 
-snapsync reads `.env`.
-
-```env
-DESTINATION_FOLDER=/path/to/destination
-DRY_RUN=true
-EXIFTOOL_PATH=/opt/homebrew/bin/exiftool
-HASH_LENGTH=12
-```
-
-Optional:
-
-```env
-FILENAME_PREFIX=
-LOG_LEVEL=INFO
-INFER_TIMEZONE_FROM_IPHONE=true
-CANON_HOME_TIMEZONE=Europe/Helsinki
-IGNORED_FOLDERS=.git,.svn,.hg,__pycache__,@eaDir,System Volume Information,$RECYCLE.BIN
-```
-
-`VAULT_ROOT` is accepted as a legacy alias for `DESTINATION_FOLDER`.
-
-## Timezone Correction
-
-This handles trips where iPhones switch to the local timezone automatically, but
-a Canon camera keeps using the home timezone.
-
-Example:
-
-- iPhone photos in Spain contain `OffsetTimeOriginal=+01:00`.
-- Canon EOS M50 photos have capture times but no timezone offset.
-- Canon clock is still set to Finland time.
-- snapsync can shift Canon-derived filename and folder timestamps so Canon and
-  iPhone photos sort together correctly.
-
-snapsync is deliberately conservative:
-
-- It checks iPhone files in the import batch for timezone metadata.
-- It only infers a timezone when the iPhone offsets agree.
-- It compares Canon timezone metadata to the iPhone timezone when Canon provides
-  a timezone.
-- It uses `CANON_HOME_TIMEZONE` only as a fallback when Canon timezone metadata
-  is missing.
-- It prints the detected iPhone offset, Canon home timezone, Canon file count,
-  and exact Canon timestamp shift.
-- It applies the Canon correction only if you type `yes`.
-- It never modifies source metadata or source files.
-- If there is no interactive confirmation, Canon timestamps are left unchanged.
-
-The same confirmation rule applies to both timezone-aware actions:
-
-- Copy action: corrected Canon time is used for the destination folder and
-  filename.
-- Repair action: corrected Canon time is used to rename existing Canon files
-  inside the current folder tree.
-
-Configuration:
-
-```env
-INFER_TIMEZONE_FROM_IPHONE=true
-CANON_HOME_TIMEZONE=Europe/Helsinki
-```
-
-To disable this behavior completely:
-
-```env
-INFER_TIMEZONE_FROM_IPHONE=false
-```
-
-Confirmation prompt example:
-
-```text
-Timezone correction
--------------------
-Detected iPhone timezone offset: +01:00
-Canon home timezone to assume: Europe/Helsinki
-Canon files without timezone metadata: 42
-Canon filename/folder timestamp shift: -1h
-
-Apply this correction to Canon files for this run?
-Type yes to apply:
-```
-
-## Usage
-
-Interactive:
+Run from the folder you want to process:
 
 ```bash
 cd "/path/to/source-folder"
 snapsync
 ```
 
-Run plain `snapsync` from the folder you want to process to get the action menu.
-Passing a folder path directly keeps the non-interactive copy behavior.
-
-You will be asked to choose:
+Choose an action:
 
 ```text
 1. Media copy + filename fix
@@ -139,24 +58,40 @@ Option `2` recursively scans the current folder and renames affected Canon
 files in place. It does not copy files, move files to another root, or edit
 embedded metadata.
 
-For option `2`, the repair target is the folder you are currently in, not
-`DESTINATION_FOLDER`.
-
 Audit without copying:
 
 ```bash
 snapsync --dry-run "/path/to/source-folder"
 ```
 
-Real copy:
-
-```env
-DRY_RUN=false
-```
+Run copy directly:
 
 ```bash
 snapsync "/path/to/source-folder"
 ```
+
+## Config
+
+snapsync reads `.env`.
+
+```env
+DESTINATION_FOLDER=/path/to/destination
+DRY_RUN=true
+EXIFTOOL_PATH=/opt/homebrew/bin/exiftool
+HASH_LENGTH=12
+```
+
+Common optional settings:
+
+```env
+FILENAME_PREFIX=
+LOG_LEVEL=INFO
+INFER_TIMEZONE_FROM_IPHONE=true
+CANON_HOME_TIMEZONE=Europe/Helsinki
+IGNORED_FOLDERS=.git,.svn,.hg,__pycache__,@eaDir,System Volume Information,$RECYCLE.BIN
+```
+
+`VAULT_ROOT` is accepted as a legacy alias for `DESTINATION_FOLDER`.
 
 For large real runs, consider:
 
@@ -164,44 +99,11 @@ For large real runs, consider:
 LOG_LEVEL=WARNING
 ```
 
-## Output
+## Where To Read More
 
-Destination structure:
-
-```text
-DESTINATION_FOLDER/
-└── YYYY/
-    └── MM - Month/
-        ├── photo/
-        ├── video/
-        └── unknown/
-```
-
-Filename format:
-
-```text
-YYYY-MM-DD_HHMMSS_DeviceName_Hash12.ext
-```
-
-Example:
-
-```text
-2026-05-18_142211_iPhone15Pro_a8f31c9e71d4.jpg
-```
-
-If `FILENAME_PREFIX` is set, it is prepended to the filename.
-
-## Reports
-
-If repeated files are found inside the source folder, snapsync writes:
-
-```text
-DESTINATION_FOLDER/_snapsync_reports/*_duplicate_groups.csv
-```
-
-The report shows which source file was kept and which repeated source files
-were skipped for the same SHA-256 hash.
-
-## Docs
-
-See `docs/` for architecture notes and decision records.
+- Destination folder structure: [docs/architecture/002-vault-structure.md](docs/architecture/002-vault-structure.md)
+- Media ingestion flow: [docs/architecture/001-media-ingestion-flow.md](docs/architecture/001-media-ingestion-flow.md)
+- Filename format: [docs/decisions/002-filename-format.md](docs/decisions/002-filename-format.md)
+- Metadata priority and fallback strategy: [docs/decisions/003-metadata-priority.md](docs/decisions/003-metadata-priority.md)
+- Timezone correction rules: [docs/decisions/006-timezone-correction.md](docs/decisions/006-timezone-correction.md)
+- Duplicate reports and collision handling: [docs/decisions/004-duplicate-and-collision-strategy.md](docs/decisions/004-duplicate-and-collision-strategy.md)

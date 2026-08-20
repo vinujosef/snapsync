@@ -17,7 +17,7 @@ PYTHON_BIN="python3"
 TARGET="${INSTALL_DIR}/${COMMAND_NAME}"
 
 if [[ ! -f "${MAIN_FILE}" ]]; then
-  echo "Could not find SnapSync main file at: ${MAIN_FILE}" >&2
+  echo "Could not find snapsync main file at: ${MAIN_FILE}" >&2
   exit 1
 fi
 

@@ -8,7 +8,7 @@ Need a deterministic priority order.
 
 ## Tooling
 
-SnapSync uses ExifTool as the authoritative metadata reader for the MVP.
+snapsync uses ExifTool as the authoritative metadata reader for the MVP.
 
 ExifTool is required at startup because media timestamp behavior should be
 predictable across iPhone, Android, DSLR, video, and exported files. Filesystem

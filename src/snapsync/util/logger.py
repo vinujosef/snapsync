@@ -1,4 +1,4 @@
-# Provide small colored console logging for SnapSync.
+# Provide small colored console logging for snapsync.
 from __future__ import annotations
 
 import sys

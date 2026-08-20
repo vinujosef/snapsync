@@ -41,7 +41,7 @@ Different files can share:
 
 Skipping a filename collision would lose data. A duplicate is safe to skip
 because the SHA-256 hash proves the content is identical. A collision is not
-safe to skip because the hash is different, so SnapSync keeps both files.
+safe to skip because the hash is different, so snapsync keeps both files.
 
 ## Tradeoffs
 

@@ -1,6 +1,6 @@
-# SnapSync
+# snapsync
 
-SnapSync is a local photo/video ingestion tool.
+snapsync is a local photo/video ingestion tool.
 
 It scans a source folder, reads metadata with ExifTool, copies media into a
 structured destination folder, normalizes filenames, skips exact duplicates,
@@ -31,7 +31,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## Configuration
 
-SnapSync reads `.env`.
+snapsync reads `.env`.
 
 ```env
 DESTINATION_FOLDER=/path/to/destination
@@ -62,10 +62,10 @@ Example:
 - iPhone photos in Spain contain `OffsetTimeOriginal=+01:00`.
 - Canon EOS M50 photos have capture times but no timezone offset.
 - Canon clock is still set to Finland time.
-- SnapSync can shift Canon-derived filename and folder timestamps so Canon and
+- snapsync can shift Canon-derived filename and folder timestamps so Canon and
   iPhone photos sort together correctly.
 
-SnapSync is deliberately conservative:
+snapsync is deliberately conservative:
 
 - It checks iPhone files in the import batch for timezone metadata.
 - It only infers a timezone when the iPhone offsets agree.
@@ -193,7 +193,7 @@ If `FILENAME_PREFIX` is set, it is prepended to the filename.
 
 ## Reports
 
-If repeated files are found inside the source folder, SnapSync writes:
+If repeated files are found inside the source folder, snapsync writes:
 
 ```text
 DESTINATION_FOLDER/_snapsync_reports/*_duplicate_groups.csv

@@ -2,8 +2,8 @@
 
 ## Flow
 
-1. User enters a source folder and runs SnapSync
-2. If no source path is passed, SnapSync asks which action to run
+1. User enters a source folder and runs snapsync
+2. If no source path is passed, snapsync asks which action to run
 3. User presses `1` for media copy plus filename fix
 4. Recursive scan begins
 5. Media files identified
@@ -29,7 +29,7 @@
 
 ## Configuration
 
-SnapSync uses environment-based configuration.
+snapsync uses environment-based configuration.
 
 The destination folder is configured externally via `.env`.
 
@@ -37,7 +37,7 @@ Example:
 
 DESTINATION_FOLDER=/path/to/destination
 EXIFTOOL_PATH=exiftool
-FILENAME_PREFIX=zSnapSyncTestFolder2026May
+FILENAME_PREFIX=zsnapsyncTestFolder2026May
 HASH_LENGTH=12
 
 All ingestion paths are derived from this destination folder.

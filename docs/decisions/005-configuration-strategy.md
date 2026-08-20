@@ -2,7 +2,7 @@
 
 ## Problem
 
-SnapSync requires configurable behavior across different machines, storage locations, and environments.
+snapsync requires configurable behavior across different machines, storage locations, and environments.
 
 Hardcoded paths and constants would make the system difficult to maintain, migrate, or reuse.
 
@@ -27,7 +27,7 @@ Hardcoded paths and constants would make the system difficult to maintain, migra
 
 ## Final Choice
 
-SnapSync uses environment-based configuration via `.env`.
+snapsync uses environment-based configuration via `.env`.
 
 Application behavior is controlled through centralized configuration loading.
 

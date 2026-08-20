@@ -9,7 +9,7 @@ import sys
 from config.settings import Settings
 from snapsync.cli import ProgressHeartbeat
 from snapsync.metadata import Metadata
-from snapsync.metadata_reader import read_metadata_or_fallback
+from snapsync.metadata_reader import read_metadata_batch_or_fallback
 
 
 IPHONE_SAMPLE_SIZE = 5
@@ -18,28 +18,21 @@ IPHONE_SAMPLE_SIZE = 5
 def collect_repair_metadata(candidates: list[Path], settings: Settings) -> dict[Path, Metadata]:
     likely_iphone_paths = [path for path in candidates if _looks_like_iphone(path)]
     likely_canon_paths = [path for path in candidates if _looks_like_canon(path)]
-    metadata_by_path: dict[Path, Metadata] = {}
+    paths_to_read: list[Path] = []
     progress = ProgressHeartbeat()
 
     for path in _stable_sample(likely_iphone_paths, IPHONE_SAMPLE_SIZE):
-        _read_one(path, settings, metadata_by_path, progress)
+        _add_path_to_read(path, paths_to_read, progress)
 
     for path in likely_canon_paths:
-        _read_one(path, settings, metadata_by_path, progress)
+        _add_path_to_read(path, paths_to_read, progress)
 
-    remaining_paths = [path for path in candidates if path not in metadata_by_path]
-    if likely_canon_paths:
-        _read_paths(
-            remaining_paths,
-            settings,
-            metadata_by_path,
-            progress,
-            stop_when_iphone_sample_is_full=True,
-        )
-    else:
-        _read_paths(remaining_paths, settings, metadata_by_path, progress)
+    for path in _stable_shuffle(candidates):
+        if _looks_like_iphone(path) and path not in paths_to_read:
+            continue
+        _add_path_to_read(path, paths_to_read, progress)
 
-    return metadata_by_path
+    return read_metadata_batch_or_fallback(paths_to_read, settings)
 
 
 def choose_iphone_timezone(metadata_by_path: dict[Path, Metadata]) -> tuple[bool, str | None]:
@@ -70,32 +63,15 @@ def sampled_iphone_offsets(metadata_by_path: dict[Path, Metadata]) -> list[str]:
     ][:IPHONE_SAMPLE_SIZE]
 
 
-def _read_paths(
-    paths: list[Path],
-    settings: Settings,
-    metadata_by_path: dict[Path, Metadata],
-    progress: ProgressHeartbeat,
-    *,
-    stop_when_iphone_sample_is_full: bool = False,
-) -> None:
-    for path in _stable_shuffle(paths):
-        if _looks_like_iphone(path) and len(sampled_iphone_offsets(metadata_by_path)) >= IPHONE_SAMPLE_SIZE:
-            continue
-        _read_one(path, settings, metadata_by_path, progress)
-        if stop_when_iphone_sample_is_full and len(sampled_iphone_offsets(metadata_by_path)) >= IPHONE_SAMPLE_SIZE:
-            break
-
-
-def _read_one(
+def _add_path_to_read(
     path: Path,
-    settings: Settings,
-    metadata_by_path: dict[Path, Metadata],
+    paths_to_read: list[Path],
     progress: ProgressHeartbeat,
 ) -> None:
-    if path in metadata_by_path:
+    if path in paths_to_read:
         return
     progress.tick()
-    metadata_by_path[path] = read_metadata_or_fallback(path, settings)
+    paths_to_read.append(path)
 
 
 def _is_iphone_metadata(metadata: Metadata) -> bool:

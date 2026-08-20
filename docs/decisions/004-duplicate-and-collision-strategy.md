@@ -19,6 +19,8 @@ Duplicates:
 - skipped during copy
 - logged in summary
 - split into files already in the destination and files repeated in the source folder
+- source-folder duplicate groups are written as CSV reports under
+  `DESTINATION_FOLDER/_snapsync_reports/`
 
 Filename collisions:
 - preserved with a collision suffix

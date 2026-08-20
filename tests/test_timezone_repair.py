@@ -26,7 +26,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 return _canon_metadata()
 
             with (
-                patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
+                patch("snapsync.timezone_sampler.read_metadata_batch_or_fallback", side_effect=_batch_metadata(fake_metadata)),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="yes"),
                 patch("builtins.print"),
@@ -54,7 +54,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 return _canon_metadata()
 
             with (
-                patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
+                patch("snapsync.timezone_sampler.read_metadata_batch_or_fallback", side_effect=_batch_metadata(fake_metadata)),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="no"),
                 patch("builtins.print"),
@@ -82,7 +82,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 return _canon_metadata()
 
             with (
-                patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
+                patch("snapsync.timezone_sampler.read_metadata_batch_or_fallback", side_effect=_batch_metadata(fake_metadata)),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="yes"),
                 patch("builtins.print"),
@@ -111,7 +111,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 return _canon_metadata()
 
             with (
-                patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
+                patch("snapsync.timezone_sampler.read_metadata_batch_or_fallback", side_effect=_batch_metadata(fake_metadata)),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="no"),
                 patch("builtins.print"),
@@ -139,7 +139,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 return _canon_metadata()
 
             with (
-                patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
+                patch("snapsync.timezone_sampler.read_metadata_batch_or_fallback", side_effect=_batch_metadata(fake_metadata)),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="yes"),
                 patch("builtins.print"),
@@ -165,7 +165,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 return _canon_metadata()
 
             with (
-                patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
+                patch("snapsync.timezone_sampler.read_metadata_batch_or_fallback", side_effect=_batch_metadata(fake_metadata)),
                 patch("builtins.print") as mocked_print,
             ):
                 run_timezone_repair(root, settings)
@@ -188,7 +188,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 return _canon_metadata()
 
             with (
-                patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
+                patch("snapsync.timezone_sampler.read_metadata_batch_or_fallback", side_effect=_batch_metadata(fake_metadata)),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", return_value="yes"),
                 patch("snapsync.actions.repair_timezone.logger.info") as mocked_info,
@@ -213,7 +213,7 @@ class TimezoneRepairTests(unittest.TestCase):
                 return _iphone_metadata()
 
             with (
-                patch("snapsync.timezone_sampler.read_metadata_or_fallback", side_effect=fake_metadata),
+                patch("snapsync.timezone_sampler.read_metadata_batch_or_fallback", side_effect=_batch_metadata(fake_metadata)),
                 patch("snapsync.actions.repair_timezone.logger.info") as mocked_info,
                 patch("builtins.print") as mocked_print,
             ):
@@ -263,6 +263,13 @@ def _canon_metadata(offset: str | None = None) -> Metadata:
         "metadata",
         offset,
     )
+
+
+def _batch_metadata(fake_metadata):
+    def fake_batch(paths, settings):
+        return {path: fake_metadata(path, settings) for path in paths}
+
+    return fake_batch
 
 
 if __name__ == "__main__":

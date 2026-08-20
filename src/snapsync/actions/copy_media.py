@@ -9,7 +9,7 @@ from snapsync.classifier import UNKNOWN, classify
 from snapsync.cli import confirm_timezone_correction
 from snapsync.copier import copy_file
 from snapsync.duplicate import build_hash_index, calculate_hash, decide_destination
-from snapsync.metadata_reader import read_metadata_or_fallback
+from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.reports import DuplicateGroup, write_duplicate_groups_report
 from snapsync.renamer import generate_filename
 from snapsync.scanner import scan_source
@@ -26,10 +26,7 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
     try:
         candidates = scan_source(source_folder, settings)
         summary.source_files_found = len(candidates)
-        metadata_by_path = {
-            path: read_metadata_or_fallback(path, settings)
-            for path in candidates
-        }
+        metadata_by_path = read_metadata_batch_or_fallback(candidates, settings)
         timezone_plan = build_timezone_correction_plan(metadata_by_path, settings)
         if timezone_plan and not confirm_timezone_correction(timezone_plan):
             logger.warning("Canon timezone correction was not confirmed; Canon timestamps are unchanged")

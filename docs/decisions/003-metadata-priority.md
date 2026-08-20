@@ -15,6 +15,17 @@ predictable across iPhone, Android, DSLR, video, and exported files. Filesystem
 timestamps remain fallbacks only when ExifTool reports no usable embedded
 timestamp for an individual file.
 
+## Reading Strategy
+
+snapsync reads metadata in this order:
+
+1. Batch read with ExifTool
+2. Single-file fallback when a batch misses a file
+3. Current date fallback when metadata cannot be read
+
+Keep this list in sync with the top comment in
+`src/snapsync/metadata_reader.py`.
+
 ## Final Choice
 
 Timestamp priority:

@@ -1,4 +1,4 @@
-# Extract capture metadata with ExifTool and safe fallbacks.
+# Talk to ExifTool and parse raw metadata.
 from __future__ import annotations
 
 import json
@@ -24,6 +24,22 @@ DEVICE_FIELDS = (
     "DeviceManufacturer",
 )
 
+EXIFTOOL_FIELDS = (
+    "-DateTimeOriginal",
+    "-CreateDate",
+    "-OffsetTime",
+    "-OffsetTimeOriginal",
+    "-OffsetTimeDigitized",
+    "-MediaCreateDate",
+    "-TrackCreateDate",
+    "-FileModifyDate",
+    "-FileCreateDate",
+    "-Model",
+    "-CameraModelName",
+    "-Make",
+    "-DeviceManufacturer",
+)
+
 
 @dataclass(frozen=True)
 class Metadata:
@@ -36,27 +52,26 @@ class Metadata:
 
 def extract_metadata(path: Path, exiftool_path: str = "exiftool") -> Metadata:
     metadata = _read_exiftool_metadata(path, exiftool_path)
-    if metadata:
-        for field in TIMESTAMP_FIELDS:
-            value = metadata.get(field)
-            parsed = _parse_datetime(value)
-            if parsed:
-                return Metadata(
-                    selected_datetime=parsed,
-                    timestamp_field=field,
-                    device_name=_extract_device_name(metadata),
-                    quality="metadata" if not field.startswith("File") else "filesystem",
-                    timezone_offset=_extract_timezone_offset(metadata),
-                )
+    parsed_metadata = _metadata_from_exiftool(metadata) if metadata else None
+    if parsed_metadata:
+        return parsed_metadata
 
-    stat = path.stat()
-    return Metadata(
-        selected_datetime=datetime.fromtimestamp(stat.st_mtime),
-        timestamp_field="FileModifyDate",
-        device_name="UnknownDevice",
-        quality="filesystem_fallback",
-        timezone_offset=None,
-    )
+    return _filesystem_metadata(path)
+
+
+def extract_metadata_batch(paths: list[Path], exiftool_path: str = "exiftool") -> dict[Path, Metadata]:
+    metadata_items = _read_exiftool_metadata_batch(paths, exiftool_path)
+    metadata_by_path: dict[Path, Metadata] = {}
+
+    for item in metadata_items:
+        source_file = item.get("SourceFile")
+        if not isinstance(source_file, str):
+            continue
+        parsed_metadata = _metadata_from_exiftool(item)
+        if parsed_metadata:
+            metadata_by_path[Path(source_file)] = parsed_metadata
+
+    return metadata_by_path
 
 
 def current_date_fallback() -> Metadata:
@@ -69,26 +84,54 @@ def current_date_fallback() -> Metadata:
     )
 
 
+def _metadata_from_exiftool(metadata: dict[str, object]) -> Metadata | None:
+    for field in TIMESTAMP_FIELDS:
+        value = metadata.get(field)
+        parsed = _parse_datetime(value)
+        if parsed:
+            return Metadata(
+                selected_datetime=parsed,
+                timestamp_field=field,
+                device_name=_extract_device_name(metadata),
+                quality="metadata" if not field.startswith("File") else "filesystem",
+                timezone_offset=_extract_timezone_offset(metadata),
+            )
+    return None
+
+
+def _filesystem_metadata(path: Path) -> Metadata:
+    stat = path.stat()
+    return Metadata(
+        selected_datetime=datetime.fromtimestamp(stat.st_mtime),
+        timestamp_field="FileModifyDate",
+        device_name="UnknownDevice",
+        quality="filesystem_fallback",
+        timezone_offset=None,
+    )
+
+
 def _read_exiftool_metadata(path: Path, exiftool_path: str) -> dict[str, object] | None:
+    data = _run_exiftool([path], exiftool_path)
+    if not data:
+        return None
+    return data[0]
+
+
+def _read_exiftool_metadata_batch(paths: list[Path], exiftool_path: str) -> list[dict[str, object]]:
+    return _run_exiftool(paths, exiftool_path) or []
+
+
+def _run_exiftool(paths: list[Path], exiftool_path: str) -> list[dict[str, object]] | None:
+    if not paths:
+        return []
+
     command = [
         exiftool_path,
         "-json",
         "-api",
         "QuickTimeUTC=1",
-        "-DateTimeOriginal",
-        "-CreateDate",
-        "-OffsetTime",
-        "-OffsetTimeOriginal",
-        "-OffsetTimeDigitized",
-        "-MediaCreateDate",
-        "-TrackCreateDate",
-        "-FileModifyDate",
-        "-FileCreateDate",
-        "-Model",
-        "-CameraModelName",
-        "-Make",
-        "-DeviceManufacturer",
-        str(path),
+        *EXIFTOOL_FIELDS,
+        *[str(path) for path in paths],
     ]
     try:
         result = subprocess.run(command, check=True, capture_output=True, text=True)
@@ -98,7 +141,7 @@ def _read_exiftool_metadata(path: Path, exiftool_path: str) -> dict[str, object]
 
     if not data:
         return None
-    return data[0]
+    return data
 
 
 def _parse_datetime(value: object) -> datetime | None:

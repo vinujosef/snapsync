@@ -590,6 +590,62 @@ class FixAuditIssuesTests(unittest.TestCase):
             )
             self.assertIn("Updated 0871a475-a7c9-4090-bc6e-68c47ca1ff4f.MP4: date/time", output.getvalue())
 
+    def test_manual_video_date_fix_does_not_create_local_machine_offset_when_missing(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            video = root / "1911202200134_encoded.mp4"
+            video.write_bytes(b"video")
+            settings = _settings(root, dry_run=False)
+            output = StringIO()
+
+            metadata_by_path = {
+                video: Metadata(
+                    selected_datetime=datetime(2022, 11, 21, 2, 0, 34),
+                    timestamp_field="FileModifyDate",
+                    device_name="UnknownDevice",
+                    quality="metadata",
+                    timezone_offset=None,
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["3", "1911202200134_encoded.mp4", "a", "2022-11-19", "yes"]),
+                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch(
+                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    return_value=Metadata(
+                        selected_datetime=datetime(2022, 11, 19, 2, 0, 34),
+                        timestamp_field="DateTimeOriginal",
+                        device_name="UnknownDevice",
+                        quality="metadata",
+                        timezone_offset=None,
+                    ),
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            run.assert_called_once_with(
+                [
+                    "exiftool",
+                    "-overwrite_original",
+                    "-P",
+                    "-DateTimeOriginal=2022:11:19 02:00:34",
+                    "-CreateDate=2022:11:19 02:00:34",
+                    str(video),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("Updated 1911202200134_encoded.mp4: date/time", output.getvalue())
+
     def test_manual_fix_can_update_one_file_time(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

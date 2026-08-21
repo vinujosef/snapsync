@@ -573,9 +573,8 @@ def _write_datetime(
                 f"-OffsetTimeDigitized={timezone_offset}",
             ]
         )
-    if _is_video(path):
-        creation_timestamp = f"{timestamp}{timezone_offset or ''}"
-        command.append(f"-Keys:CreationDate={creation_timestamp}")
+    if _is_video(path) and parse_timezone_offset_minutes(timezone_offset) is not None:
+        command.append(f"-Keys:CreationDate={timestamp}{timezone_offset}")
     command.append(str(path))
 
     subprocess.run(

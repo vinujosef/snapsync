@@ -10,6 +10,7 @@ from snapsync.constants import (
     ACTION_COPY,
     ACTION_FIX_AUDIT_ISSUES,
     ACTION_QUIT,
+    ACTION_RENAME,
 )
 from snapsync.timezone_correction import (
     TimezoneCorrectionPlan,
@@ -32,7 +33,8 @@ def choose_interactive_action() -> str:
     print(cyan("-----------------"))
     print("1️⃣  Audit files in this folder")
     print("2️⃣  Fix audit issues in this folder")
-    print("3️⃣  Rename + copy")
+    print("3️⃣  Rename files in this folder")
+    print("4️⃣  Copy files to destination")
     print("q. Quit")
 
     choice = input("> ").strip().lower()
@@ -41,6 +43,8 @@ def choose_interactive_action() -> str:
     if choice == "2":
         return ACTION_FIX_AUDIT_ISSUES
     if choice == "3":
+        return ACTION_RENAME
+    if choice == "4":
         return ACTION_COPY
     return ACTION_QUIT
 
@@ -53,12 +57,15 @@ def print_action_context(action: str, source_folder: Path, settings: Settings) -
     elif action == ACTION_FIX_AUDIT_ISSUES:
         _print_action_heading("FIX AUDIT ISSUES IN THIS FOLDER:")
         print(f"🔎 Source folder: {source_folder}")
-    else:
-        _print_action_heading("COPY MEDIA + FILENAME FIX:")
-        print(f"➡️ Source folder: {source_folder}")
-        print(f"⬅️ Copy destination folder: {settings.destination_folder}")
+    elif action == ACTION_RENAME:
+        _print_action_heading("RENAME FILES IN THIS FOLDER:")
+        print(f"🔎 Source folder: {source_folder}")
         print(f"🧾 Filename prefix: {settings.filename_prefix or '(none)'}")
         print(f"#️⃣ Filename hash length: {settings.hash_length}")
+    else:
+        _print_action_heading("COPY FILES TO DESTINATION:")
+        print(f"➡️ Source folder: {source_folder}")
+        print(f"⬅️ Copy destination folder: {settings.destination_folder}")
     print(f"✳️ Dry Run : {'yes' if settings.dry_run else 'no'}")
 
 

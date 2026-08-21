@@ -11,7 +11,6 @@ from snapsync.copier import copy_file
 from snapsync.duplicate import build_hash_index, calculate_hash, decide_destination
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.reports import DuplicateGroup, write_duplicate_groups_report
-from snapsync.renamer import generate_filename
 from snapsync.scanner import scan_source
 from snapsync.summary import RunSummary
 from snapsync.timezone_correction import apply_timezone_correction, build_timezone_correction_plan
@@ -54,15 +53,7 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
             metadata = metadata_by_path[source_path]
             selected_datetime = apply_timezone_correction(metadata, timezone_plan)
             file_hash = calculate_hash(source_path)
-            filename = generate_filename(
-                selected_datetime,
-                metadata.device_name,
-                file_hash,
-                source_path,
-                settings.filename_prefix,
-                settings.hash_length,
-            )
-            target_path = build_destination_path(settings, selected_datetime, media_type, filename)
+            target_path = build_destination_path(settings, selected_datetime, media_type, source_path.name)
 
             decision = decide_destination(file_hash, target_path, hash_index, run_hash_index)
             if decision.action == "skip":

@@ -50,7 +50,8 @@ Choose an action:
 ```text
 1. Audit files in this folder
 2. Fix audit issues in this folder
-3. Rename + copy
+3. Rename files in this folder
+4. Copy files to destination
 q. Quit
 ```
 
@@ -95,7 +96,11 @@ uses step markers (`i.`, `ii.`, `iii.`) and shows the selected file's current
 metadata in a one-row table before asking what to change. Option `2` repair
 subflows use the same step-marker style.
 
-Option `3` renames files and copies media into `DESTINATION_FOLDER`.
+Option `3` renames media files in place using snapsync's normalized filename
+rules. It does not copy files to `DESTINATION_FOLDER`.
+
+Option `4` copies files from the current folder into `DESTINATION_FOLDER`,
+preserving their current filenames.
 
 Audit without copying:
 

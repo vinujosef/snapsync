@@ -10,6 +10,7 @@ from snapsync.constants import (
     ACTION_AUDIT_FOLDER,
     ACTION_COPY,
     ACTION_FIX_AUDIT_ISSUES,
+    ACTION_RENAME,
 )
 from snapsync.main import _format_duration, main
 
@@ -37,6 +38,7 @@ class MainTests(unittest.TestCase):
             (ACTION_COPY, "run_media_copy"),
             (ACTION_AUDIT_FOLDER, "run_folder_audit"),
             (ACTION_FIX_AUDIT_ISSUES, "run_audit_issue_fix"),
+            (ACTION_RENAME, "run_media_rename"),
         )
 
         for action, runner_name in action_cases:

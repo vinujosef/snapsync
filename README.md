@@ -97,7 +97,8 @@ metadata in a one-row table before asking what to change. Option `2` repair
 subflows use the same step-marker style.
 
 Option `3` renames media files in place using snapsync's normalized filename
-rules. It does not copy files to `DESTINATION_FOLDER`.
+rules and the current file metadata. It does not run timezone correction, edit
+metadata, or copy files to `DESTINATION_FOLDER`.
 
 Option `4` copies files from the current folder into `DESTINATION_FOLDER`,
 preserving their current filenames.

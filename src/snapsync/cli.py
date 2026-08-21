@@ -9,6 +9,7 @@ from config.settings import Settings
 from snapsync.constants import (
     ACTION_AUDIT_FOLDER,
     ACTION_COPY,
+    ACTION_FIX_AUDIT_ISSUES,
     ACTION_QUIT,
     ACTION_REPAIR_TIMEZONE,
 )
@@ -35,6 +36,7 @@ def choose_interactive_action() -> str:
     print("1️⃣  Media copy + filename fix")
     print("2️⃣  Fix Canon timezone issue in this folder")
     print("3️⃣  Audit files in this folder")
+    print("4️⃣  Fix audit issues in this folder")
     print("q. Quit")
 
     choice = input("> ").strip().lower()
@@ -44,6 +46,8 @@ def choose_interactive_action() -> str:
         return ACTION_REPAIR_TIMEZONE
     if choice == "3":
         return ACTION_AUDIT_FOLDER
+    if choice == "4":
+        return ACTION_FIX_AUDIT_ISSUES
     return ACTION_QUIT
 
 
@@ -55,6 +59,9 @@ def print_action_context(action: str, source_folder: Path, settings: Settings) -
         print(f"⏱️ Scope hint: {_last_path_parts(source_folder, 5)}")
     elif action == ACTION_AUDIT_FOLDER:
         _print_action_heading("AUDIT FILES IN THIS FOLDER:")
+        print(f"🔎 Source folder: {source_folder}")
+    elif action == ACTION_FIX_AUDIT_ISSUES:
+        _print_action_heading("FIX AUDIT ISSUES IN THIS FOLDER:")
         print(f"🔎 Source folder: {source_folder}")
     else:
         _print_action_heading("COPY MEDIA + FILENAME FIX:")

@@ -6,7 +6,12 @@ from unittest.mock import patch
 import unittest
 
 from config.settings import Settings
-from snapsync.constants import ACTION_AUDIT_FOLDER, ACTION_COPY, ACTION_REPAIR_TIMEZONE
+from snapsync.constants import (
+    ACTION_AUDIT_FOLDER,
+    ACTION_COPY,
+    ACTION_FIX_AUDIT_ISSUES,
+    ACTION_REPAIR_TIMEZONE,
+)
 from snapsync.main import _format_duration, main
 
 
@@ -33,6 +38,7 @@ class MainTests(unittest.TestCase):
             (ACTION_COPY, "run_media_copy"),
             (ACTION_REPAIR_TIMEZONE, "run_timezone_repair"),
             (ACTION_AUDIT_FOLDER, "run_folder_audit"),
+            (ACTION_FIX_AUDIT_ISSUES, "run_audit_issue_fix"),
         )
 
         for action, runner_name in action_cases:

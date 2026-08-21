@@ -27,6 +27,7 @@ DEVICE_FIELDS = (
 EXIFTOOL_FIELDS = (
     "-DateTimeOriginal",
     "-CreateDate",
+    "-CreationDate",
     "-OffsetTime",
     "-OffsetTimeOriginal",
     "-OffsetTimeDigitized",
@@ -196,7 +197,25 @@ def _extract_timezone_offset(metadata: dict[str, object]) -> tuple[str | None, s
         value = metadata.get(field)
         if isinstance(value, str) and _parse_timezone_offset_minutes(value) is not None:
             return value.strip(), field
+    for field in ("CreationDate", "DateTimeOriginal"):
+        value = metadata.get(field)
+        offset = _extract_datetime_timezone_offset(value)
+        if offset:
+            return offset, field
     return None, None
+
+
+def _extract_datetime_timezone_offset(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    if cleaned.endswith("Z"):
+        return "+00:00"
+    if len(cleaned) >= 6 and cleaned[-6] in {"+", "-"} and cleaned[-3] == ":":
+        offset = cleaned[-6:]
+        if _parse_timezone_offset_minutes(offset) is not None:
+            return offset
+    return None
 
 
 def parse_timezone_offset_minutes(value: str | None) -> int | None:

@@ -72,7 +72,7 @@ class AuditFolderTests(unittest.TestCase):
                 text,
             )
             self.assertIn(
-                "| \033[31mclip.mov\033[0m     | 2026-05-19 | 09:01:02 | \033[31mMediaCreateDate\033[0m  | \033[31m(none)\033[0m | Canon EOS M50 |",
+                "| \033[31mclip.mov\033[0m     | 2026-05-19 | 09:01:02 | \033[33mMediaCreateDate\033[0m  | \033[31m(none)\033[0m | Canon EOS M50 |",
                 text,
             )
             self.assertIn("\033[36mIssue(s):\033[0m", text)
@@ -98,6 +98,55 @@ class AuditFolderTests(unittest.TestCase):
             self.assertNotIn("Helsinki 2025:", output.getvalue())
             self.assertNotIn("Details:", output.getvalue())
             self.assertNotIn("Issue(s):", output.getvalue())
+
+    def test_orders_details_by_date_time_then_filename(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            later = root / "A_later.jpg"
+            early_b = root / "B_same_time.jpg"
+            early_a = root / "A_same_time.jpg"
+            for path in (later, early_b, early_a):
+                path.write_bytes(b"photo")
+            settings = _settings(root)
+            output = StringIO()
+
+            metadata_by_path = {
+                later: Metadata(
+                    selected_datetime=datetime(2026, 5, 6, 8, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+03:00",
+                ),
+                early_b: Metadata(
+                    selected_datetime=datetime(2026, 5, 5, 8, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+03:00",
+                ),
+                early_a: Metadata(
+                    selected_datetime=datetime(2026, 5, 5, 8, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+03:00",
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.audit_folder.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_folder_audit(root, settings)
+
+            text = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertLess(text.index("A_same_time.jpg"), text.index("B_same_time.jpg"))
+            self.assertLess(text.index("B_same_time.jpg"), text.index("A_later.jpg"))
 
     def test_prints_helsinki_dst_rules_for_each_file_year(self):
         with TemporaryDirectory() as temp_dir:
@@ -240,7 +289,7 @@ class AuditFolderTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertIn("\033[31mUnknownDevice\033[0m", output.getvalue())
 
-    def test_marks_taken_from_red_when_not_datetime_original(self):
+    def test_marks_taken_from_yellow_when_not_datetime_original(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             photo = root / "fallback.jpg"
@@ -268,7 +317,11 @@ class AuditFolderTests(unittest.TestCase):
                 exit_code = run_folder_audit(root, settings)
 
             self.assertEqual(exit_code, 0)
-            self.assertIn("\033[31mCreateDate\033[0m", output.getvalue())
+            text = output.getvalue()
+            self.assertIn("\033[33mCreateDate\033[0m", text)
+            self.assertIn("\033[33mfallback.jpg\033[0m", text)
+            self.assertNotIn("\033[31mCreateDate\033[0m", text)
+            self.assertNotIn("\033[31mfallback.jpg\033[0m", text)
 
     def test_marks_missing_timezone_red(self):
         with TemporaryDirectory() as temp_dir:
@@ -350,24 +403,39 @@ class AuditFolderTests(unittest.TestCase):
             self.assertIn("\033[36mTimestamp not DateTimeOriginal: 1\033[0m", text)
             self.assertIn("\033[36mUnknown device: 1\033[0m", text)
 
-    def test_prints_divider_after_every_50_file_rows(self):
+    def test_prints_divider_when_file_date_changes(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            paths = [root / f"IMG_{index:04d}.JPG" for index in range(51)]
-            for path in paths:
+            first = root / "first.jpg"
+            second = root / "second.jpg"
+            third = root / "third.jpg"
+            for path in (first, second, third):
                 path.write_bytes(b"photo")
             settings = _settings(root)
             output = StringIO()
 
             metadata_by_path = {
-                path: Metadata(
+                first: Metadata(
                     selected_datetime=datetime(2026, 1, 5, 12, 0, 0),
                     timestamp_field="DateTimeOriginal",
                     device_name="iPhone 16 Pro",
                     quality="metadata",
                     timezone_offset="+02:00",
-                )
-                for path in paths
+                ),
+                second: Metadata(
+                    selected_datetime=datetime(2026, 1, 5, 13, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+02:00",
+                ),
+                third: Metadata(
+                    selected_datetime=datetime(2026, 1, 6, 12, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+02:00",
+                ),
             }
 
             with (
@@ -382,8 +450,16 @@ class AuditFolderTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             lines = output.getvalue().splitlines()
             header = next(line for line in lines if line.startswith("| Filename"))
-            divider = next(line for line in lines if set(line) == {"-"} and len(line) > 32)
-            self.assertEqual(len(divider), len(header))
+            divider_indexes = [
+                index
+                for index, line in enumerate(lines)
+                if set(line) == {"-"} and len(line) == len(header)
+            ]
+            self.assertEqual(len(divider_indexes), 1)
+            second_index = lines.index("| second.jpg | 2026-01-05 | 13:00:00 | DateTimeOriginal | +02:00 | iPhone 16 Pro |")
+            third_index = lines.index("| third.jpg  | 2026-01-06 | 12:00:00 | DateTimeOriginal | +02:00 | iPhone 16 Pro |")
+            self.assertLess(second_index, divider_indexes[0])
+            self.assertLess(divider_indexes[0], third_index)
 
 
 def _settings(root: Path) -> Settings:
@@ -404,6 +480,7 @@ def _strip_colors(value: str) -> str:
     for color in (
         "\033[0m",
         "\033[31m",
+        "\033[33m",
         "\033[36m",
     ):
         value = value.replace(color, "")

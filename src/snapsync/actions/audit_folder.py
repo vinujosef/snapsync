@@ -17,6 +17,7 @@ from snapsync.util import logger
 RESET = "\033[0m"
 CYAN = "\033[36m"
 RED = "\033[31m"
+YELLOW = "\033[33m"
 ANSI_PATTERN = re.compile(r"\033\[[0-9;]*m")
 
 
@@ -34,11 +35,23 @@ def run_folder_audit(source_folder: Path, settings: Settings) -> int:
     if not candidates:
         return 0
 
-    rows = [_metadata_row(path, metadata_by_path[path]) for path in candidates]
+    sorted_candidates = _sort_paths_by_taken_at(candidates, metadata_by_path)
+    rows = [_metadata_row(path, metadata_by_path[path]) for path in sorted_candidates]
     _print_section_heading("Details")
     _print_table(rows)
-    _print_issues_section(candidates, metadata_by_path)
+    _print_issues_section(sorted_candidates, metadata_by_path)
     return 0
+
+
+def _sort_paths_by_taken_at(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[Path]:
+    return sorted(
+        candidates,
+        key=lambda path: (
+            metadata_by_path[path].selected_datetime,
+            path.name.lower(),
+            str(path).lower(),
+        ),
+    )
 
 
 def _metadata_row(path: Path, metadata: Metadata) -> list[str]:
@@ -54,8 +67,11 @@ def _metadata_row(path: Path, metadata: Metadata) -> list[str]:
 
 
 def _file_cell(path: Path, metadata: Metadata) -> str:
-    if _metadata_has_warning(metadata):
+    warnings = _metadata_warnings(metadata)
+    if warnings & {"timezone", "device"}:
         return _error_color(path.name)
+    if "timestamp" in warnings:
+        return _warning_color(path.name)
     return path.name
 
 
@@ -76,7 +92,7 @@ def _metadata_warnings(metadata: Metadata) -> set[str]:
 
 def _timestamp_field_cell(metadata: Metadata) -> str:
     if metadata.timestamp_field != "DateTimeOriginal":
-        return _error_color(metadata.timestamp_field)
+        return _warning_color(metadata.timestamp_field)
     return metadata.timestamp_field
 
 
@@ -179,6 +195,10 @@ def _error_color(value: str) -> str:
     return f"{RED}{value}{RESET}"
 
 
+def _warning_color(value: str) -> str:
+    return f"{YELLOW}{value}{RESET}"
+
+
 def _print_section_heading(title: str) -> None:
     print()
     print(_info_color(f"{title}:"))
@@ -202,10 +222,13 @@ def _print_table(rows: list[list[str]]) -> None:
     print(_format_table_row(headers, widths))
     print(_format_table_separator(widths))
     row_width = _visible_len(_format_table_row(headers, widths))
-    for index, row in enumerate(rows, start=1):
-        print(_format_table_row(row, widths))
-        if index % 50 == 0 and index < len(rows):
+    previous_date: str | None = None
+    for row in rows:
+        current_date = row[1]
+        if previous_date is not None and current_date != previous_date:
             print("-" * row_width)
+        print(_format_table_row(row, widths))
+        previous_date = current_date
 
 
 def _format_table_row(values: list[str], widths: list[int]) -> str:

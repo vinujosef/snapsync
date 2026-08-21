@@ -15,11 +15,13 @@ if __package__ in {None, ""}:
 from config.settings import get_settings
 from snapsync.actions.audit_folder import run_folder_audit
 from snapsync.actions.copy_media import run_media_copy
+from snapsync.actions.fix_audit_issues import run_audit_issue_fix
 from snapsync.actions.repair_timezone import run_timezone_repair
 from snapsync.cli import choose_interactive_action, print_action_context
 from snapsync.constants import (
     ACTION_AUDIT_FOLDER,
     ACTION_COPY,
+    ACTION_FIX_AUDIT_ISSUES,
     ACTION_QUIT,
     ACTION_REPAIR_TIMEZONE,
 )
@@ -55,6 +57,8 @@ def main(argv: list[str] | None = None) -> int:
         exit_code = run_timezone_repair(source_folder, settings)
     elif action == ACTION_AUDIT_FOLDER:
         exit_code = run_folder_audit(source_folder, settings)
+    elif action == ACTION_FIX_AUDIT_ISSUES:
+        exit_code = run_audit_issue_fix(source_folder, settings)
     else:
         exit_code = run_media_copy(source_folder, settings)
     print(f"Run time: {_format_duration(perf_counter() - started_at)}")

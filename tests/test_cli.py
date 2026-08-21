@@ -2,7 +2,7 @@ from unittest.mock import patch
 import unittest
 
 from snapsync.cli import choose_interactive_action
-from snapsync.constants import ACTION_AUDIT_FOLDER
+from snapsync.constants import ACTION_AUDIT_FOLDER, ACTION_FIX_AUDIT_ISSUES
 
 
 class CliTests(unittest.TestCase):
@@ -12,6 +12,13 @@ class CliTests(unittest.TestCase):
             patch("builtins.print"),
         ):
             self.assertEqual(choose_interactive_action(), ACTION_AUDIT_FOLDER)
+
+    def test_option_four_selects_audit_issue_fix(self):
+        with (
+            patch("builtins.input", return_value="4"),
+            patch("builtins.print"),
+        ):
+            self.assertEqual(choose_interactive_action(), ACTION_FIX_AUDIT_ISSUES)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ preserves filename conflicts, and prints a run summary.
 - Continue after individual file errors.
 - Read metadata with ExifTool in batches, with safe fallbacks for unreadable files.
 - Apply Canon timezone correction only after you type `yes`.
+- Preserve file modified timestamps during audit metadata repairs.
 
 ## Install
 
@@ -50,6 +51,7 @@ Choose an action:
 1. Media copy + filename fix
 2. Fix Canon timezone issue in this folder
 3. Audit files in this folder
+4. Fix audit issues in this folder
 q. Quit
 ```
 
@@ -62,6 +64,8 @@ embedded metadata.
 Option `3` recursively scans the current folder and prints the number of files
 found, the audit rules, a compact details table, and an issue summary at the
 end.
+Media rows are ordered by taken date/time, then filename, with divider lines
+between date groups.
 The rules include the Helsinki baseline timezone, Helsinki daylight saving
 offset dates for years present in the audited files, and timestamp priority
 order.
@@ -69,9 +73,34 @@ The audit info block is color-coded without using red or green.
 In the metadata table, a timezone is shown in red when it does not match the
 expected Helsinki offset for the file's taken date or when no timezone was
 found.
-The timestamp source is shown in red when it is not `DateTimeOriginal`.
+The timestamp source is shown in yellow when it is not `DateTimeOriginal`.
 `UnknownDevice` is also shown in red.
-When any warning appears in a row, that file's name is shown in red too.
+When a row has a red warning, that file's name is shown in red too. When the
+only warning is the timestamp source, that file's name is shown in yellow.
+
+Option `4` scans the current folder for audit issues, shows issue counts, and
+lets you choose one issue type to fix. Timezone fixes set Helsinki's expected
+offset for each file's date; the preview table shows each file's date, time,
+device, current offset, new offset, and action before confirmation. The same
+Helsinki timezone rules shown in the audit appear above the preview table.
+Unknown-device fixes prompt for a device model per file, with a shortcut for
+`WhatsApp`; each file is shown in a one-row metadata table before the device
+choice. The selected subflow exits when finished.
+Timezone and unknown-device fix lists are also ordered by taken date/time, then
+filename.
+For videos with no readable offset, timezone repair also writes a timezone-aware
+`CreationDate` and verifies that snapsync can read the expected offset back.
+Metadata repair writes preserve filesystem modified time so files that still
+fall back to `FileModifyDate` do not jump to the repair run time.
+Manual date/time edits also write the existing timezone offset fields when an
+offset is known, so the local computer timezone is not introduced during repair.
+When video metadata contains both a local-machine `DateTimeOriginal` offset and
+a timezone-aware `CreationDate`, snapsync uses the `CreationDate` offset.
+Option `4` also includes a manual one-file editor. Enter a filename, then choose
+whether to edit its date, time, offset, or device metadata. The manual editor
+uses step markers (`i.`, `ii.`, `iii.`) and shows the selected file's current
+metadata in a one-row table before asking what to change. Option `4` repair
+subflows use the same step-marker style.
 
 Audit without copying:
 

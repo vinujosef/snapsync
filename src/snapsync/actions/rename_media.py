@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import sys
 
 from config.settings import Settings
 from snapsync.classifier import UNKNOWN, classify
@@ -17,14 +18,22 @@ from snapsync.util import logger
 
 @dataclass(frozen=True)
 class RenameChange:
+    source_path: Path
+    target_path: Path
     old_name: str
     new_name: str
     taken_date: str
+    collision: bool
 
 
 def run_media_rename(source_folder: Path, settings: Settings) -> int:
     summary = RunSummary(audit_mode=settings.dry_run, action_label="rename")
     changes: list[RenameChange] = []
+
+    if not _confirm_rename(settings):
+        logger.warning("Rename was not confirmed; no files were renamed")
+        summary.print()
+        return 0
 
     try:
         candidates = scan_source(source_folder, settings)
@@ -72,17 +81,14 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
 
             changes.append(
                 RenameChange(
+                    source_path=source_path,
+                    target_path=target_path,
                     old_name=source_path.name,
                     new_name=target_path.name,
                     taken_date=selected_datetime.strftime("%Y-%m-%d"),
+                    collision=target_path.name != filename,
                 )
             )
-            if settings.dry_run:
-                summary.planned_copies += 1
-            else:
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                source_path.rename(target_path)
-                summary.copied_files += 1
             if target_path.name != filename:
                 summary.filename_collisions_handled += 1
                 logger.warning(f"Collision handled for {source_path.name}: {target_path.name}")
@@ -93,6 +99,18 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
     if changes:
         _print_rename_table(changes)
         print()
+
+    for change in changes:
+        if settings.dry_run:
+            summary.planned_copies += 1
+            continue
+        try:
+            change.target_path.parent.mkdir(parents=True, exist_ok=True)
+            change.source_path.rename(change.target_path)
+            summary.copied_files += 1
+        except Exception as exc:
+            summary.errors += 1
+            logger.error(f"Could not rename {change.old_name}: {exc}")
 
     summary.print()
     return 0 if summary.errors == 0 else 1
@@ -135,3 +153,12 @@ def _format_table_row(values: list[str], widths: list[int]) -> str:
         for index, value in enumerate(values)
     ]
     return f"| {' | '.join(cells)} |"
+
+
+def _confirm_rename(settings: Settings) -> bool:
+    if not sys.stdin.isatty():
+        print("No interactive confirmation available; skipping rename.")
+        return False
+
+    prompt = "Type yes to preview rename dry-run: " if settings.dry_run else "Type yes to rename files: "
+    return input(prompt).strip().lower() == "yes"

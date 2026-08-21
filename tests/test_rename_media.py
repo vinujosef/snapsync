@@ -36,6 +36,8 @@ class RenameMediaTests(unittest.TestCase):
                     "snapsync.actions.rename_media.read_metadata_batch_or_fallback",
                     return_value=metadata_by_path,
                 ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", return_value="yes"),
                 redirect_stdout(output),
             ):
                 exit_code = run_media_rename(root, settings)
@@ -70,6 +72,8 @@ class RenameMediaTests(unittest.TestCase):
                     "snapsync.actions.rename_media.read_metadata_batch_or_fallback",
                     return_value=metadata_by_path,
                 ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", return_value="yes"),
                 redirect_stdout(output),
             ):
                 exit_code = run_media_rename(root, settings)
@@ -104,6 +108,8 @@ class RenameMediaTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("snapsync.cli.confirm_timezone_correction") as confirm,
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", return_value="yes"),
                 redirect_stdout(output),
             ):
                 exit_code = run_media_rename(root, settings)
@@ -144,6 +150,8 @@ class RenameMediaTests(unittest.TestCase):
                     "snapsync.actions.rename_media.read_metadata_batch_or_fallback",
                     return_value=metadata_by_path,
                 ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", return_value="yes"),
                 redirect_stdout(output),
             ):
                 exit_code = run_media_rename(root, settings)
@@ -156,6 +164,31 @@ class RenameMediaTests(unittest.TestCase):
             separator = "-" * len(first_row)
             self.assertLess(text.index(first_row), text.index(separator))
             self.assertLess(text.index(separator), text.index(second_row))
+
+    def test_rename_requires_yes_before_scanning_or_changing_files(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "IMG_0001.JPG"
+            content = b"photo"
+            photo.write_bytes(content)
+            settings = _settings(root, dry_run=False)
+            output = StringIO()
+
+            with (
+                patch("snapsync.actions.rename_media.scan_source") as scan_source,
+                patch("snapsync.actions.rename_media.read_metadata_batch_or_fallback") as read_metadata,
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", return_value="no"),
+                patch("snapsync.actions.rename_media.logger.warning") as warning,
+                redirect_stdout(output),
+            ):
+                exit_code = run_media_rename(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(photo.exists())
+            scan_source.assert_not_called()
+            read_metadata.assert_not_called()
+            warning.assert_any_call("Rename was not confirmed; no files were renamed")
 
 
 def _settings(root: Path, *, dry_run: bool) -> Settings:

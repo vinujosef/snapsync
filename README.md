@@ -49,6 +49,7 @@ Choose an action:
 ```text
 1. Media copy + filename fix
 2. Fix Canon timezone issue in this folder
+3. Audit files in this folder
 q. Quit
 ```
 
@@ -57,6 +58,20 @@ Option `1` copies media into `DESTINATION_FOLDER`.
 Option `2` recursively scans the current folder and renames affected Canon
 files in place. It does not copy files, move files to another root, or edit
 embedded metadata.
+
+Option `3` recursively scans the current folder and prints the number of files
+found, the audit rules, a compact details table, and an issue summary at the
+end.
+The rules include the Helsinki baseline timezone, Helsinki daylight saving
+offset dates for years present in the audited files, and timestamp priority
+order.
+The audit info block is color-coded without using red or green.
+In the metadata table, a timezone is shown in red when it does not match the
+expected Helsinki offset for the file's taken date or when no timezone was
+found.
+The timestamp source is shown in red when it is not `DateTimeOriginal`.
+`UnknownDevice` is also shown in red.
+When any warning appears in a row, that file's name is shown in red too.
 
 Audit without copying:
 
@@ -69,6 +84,8 @@ Run copy directly:
 ```bash
 snapsync "/path/to/source-folder"
 ```
+
+Every action prints the total run time when it finishes.
 
 ## Config
 

@@ -48,6 +48,8 @@ class Metadata:
     device_name: str
     quality: str
     timezone_offset: str | None = None
+    timezone_field: str | None = None
+    device_field: str | None = None
 
 
 def extract_metadata(path: Path, exiftool_path: str = "exiftool") -> Metadata:
@@ -89,12 +91,16 @@ def _metadata_from_exiftool(metadata: dict[str, object]) -> Metadata | None:
         value = metadata.get(field)
         parsed = _parse_datetime(value)
         if parsed:
+            device_name, device_field = _extract_device_name(metadata)
+            timezone_offset, timezone_field = _extract_timezone_offset(metadata)
             return Metadata(
                 selected_datetime=parsed,
                 timestamp_field=field,
-                device_name=_extract_device_name(metadata),
+                device_name=device_name,
                 quality="metadata" if not field.startswith("File") else "filesystem",
-                timezone_offset=_extract_timezone_offset(metadata),
+                timezone_offset=timezone_offset,
+                timezone_field=timezone_field,
+                device_field=device_field,
             )
     return None
 
@@ -177,20 +183,20 @@ def _strip_timezone(value: str) -> str:
     return value
 
 
-def _extract_device_name(metadata: dict[str, object]) -> str:
+def _extract_device_name(metadata: dict[str, object]) -> tuple[str, str | None]:
     for field in DEVICE_FIELDS:
         value = metadata.get(field)
         if isinstance(value, str) and value.strip():
-            return value.strip()
-    return "UnknownDevice"
+            return value.strip(), field
+    return "UnknownDevice", None
 
 
-def _extract_timezone_offset(metadata: dict[str, object]) -> str | None:
+def _extract_timezone_offset(metadata: dict[str, object]) -> tuple[str | None, str | None]:
     for field in ("OffsetTimeOriginal", "OffsetTime", "OffsetTimeDigitized"):
         value = metadata.get(field)
         if isinstance(value, str) and _parse_timezone_offset_minutes(value) is not None:
-            return value.strip()
-    return None
+            return value.strip(), field
+    return None, None
 
 
 def parse_timezone_offset_minutes(value: str | None) -> int | None:

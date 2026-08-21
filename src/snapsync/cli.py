@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from config.settings import Settings
-from snapsync.constants import ACTION_COPY, ACTION_QUIT, ACTION_REPAIR_TIMEZONE
+from snapsync.constants import (
+    ACTION_AUDIT_FOLDER,
+    ACTION_COPY,
+    ACTION_QUIT,
+    ACTION_REPAIR_TIMEZONE,
+)
 from snapsync.timezone_correction import (
     TimezoneCorrectionPlan,
     describe_shift,
@@ -29,6 +34,7 @@ def choose_interactive_action() -> str:
     print(cyan("-----------------"))
     print("1️⃣  Media copy + filename fix")
     print("2️⃣  Fix Canon timezone issue in this folder")
+    print("3️⃣  Audit files in this folder")
     print("q. Quit")
 
     choice = input("> ").strip().lower()
@@ -36,6 +42,8 @@ def choose_interactive_action() -> str:
         return ACTION_COPY
     if choice == "2":
         return ACTION_REPAIR_TIMEZONE
+    if choice == "3":
+        return ACTION_AUDIT_FOLDER
     return ACTION_QUIT
 
 
@@ -45,6 +53,9 @@ def print_action_context(action: str, source_folder: Path, settings: Settings) -
         _print_action_heading("FIX CANON TIMEZONE ISSUE:")
         print(f"⬅️➡️ Repair folder: {source_folder}")
         print(f"⏱️ Scope hint: {_last_path_parts(source_folder, 5)}")
+    elif action == ACTION_AUDIT_FOLDER:
+        _print_action_heading("AUDIT FILES IN THIS FOLDER:")
+        print(f"🔎 Source folder: {source_folder}")
     else:
         _print_action_heading("COPY MEDIA + FILENAME FIX:")
         print(f"➡️ Source folder: {source_folder}")

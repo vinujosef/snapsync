@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 from config.settings import Settings
@@ -11,12 +10,10 @@ from snapsync.constants import (
     ACTION_COPY,
     ACTION_FIX_AUDIT_ISSUES,
     ACTION_QUIT,
-    ACTION_REPAIR_TIMEZONE,
 )
 from snapsync.timezone_correction import (
     TimezoneCorrectionPlan,
     describe_shift,
-    diagnose_timezone_correction,
 )
 
 
@@ -33,31 +30,24 @@ def choose_interactive_action() -> str:
     print()
     print(cyan("Choose an action:", bold=True))
     print(cyan("-----------------"))
-    print("1️⃣  Media copy + filename fix")
-    print("2️⃣  Fix Canon timezone issue in this folder")
-    print("3️⃣  Audit files in this folder")
-    print("4️⃣  Fix audit issues in this folder")
+    print("1️⃣  Audit files in this folder")
+    print("2️⃣  Fix audit issues in this folder")
+    print("3️⃣  Rename + copy")
     print("q. Quit")
 
     choice = input("> ").strip().lower()
     if choice == "1":
-        return ACTION_COPY
-    if choice == "2":
-        return ACTION_REPAIR_TIMEZONE
-    if choice == "3":
         return ACTION_AUDIT_FOLDER
-    if choice == "4":
+    if choice == "2":
         return ACTION_FIX_AUDIT_ISSUES
+    if choice == "3":
+        return ACTION_COPY
     return ACTION_QUIT
 
 
 def print_action_context(action: str, source_folder: Path, settings: Settings) -> None:
     print()
-    if action == ACTION_REPAIR_TIMEZONE:
-        _print_action_heading("FIX CANON TIMEZONE ISSUE:")
-        print(f"⬅️➡️ Repair folder: {source_folder}")
-        print(f"⏱️ Scope hint: {_last_path_parts(source_folder, 5)}")
-    elif action == ACTION_AUDIT_FOLDER:
+    if action == ACTION_AUDIT_FOLDER:
         _print_action_heading("AUDIT FILES IN THIS FOLDER:")
         print(f"🔎 Source folder: {source_folder}")
     elif action == ACTION_FIX_AUDIT_ISSUES:
@@ -89,18 +79,6 @@ def confirm_timezone_correction(timezone_plan: TimezoneCorrectionPlan) -> bool:
     return choice == "yes"
 
 
-def print_timezone_repair_skip_message(metadata_by_path, settings: Settings) -> None:
-    diagnostics = diagnose_timezone_correction(
-        metadata_by_path,
-        settings,
-        force_canon_home_timezone=True,
-    )
-    summary = repair_skip_message(diagnostics.reason)
-    symbol = "⚠️" if summary.kind == "warning" else "ℹ️"
-    print()
-    print(f"{symbol}  {summary.message}")
-
-
 class ProgressHeartbeat:
     def __init__(self, label: str = "⏳ Still working...", interval: int = 50) -> None:
         self.label = label
@@ -129,36 +107,3 @@ def cyan(text: str, *, bold: bool = False) -> str:
 def _color(text: str, color: str, bold: bool) -> str:
     prefix = f"{BOLD}{color}" if bold else color
     return f"{prefix}{text}{RESET}"
-
-
-def _last_path_parts(path: Path, count: int) -> str:
-    tail = path.parts[-count:]
-    if path.is_absolute():
-        return "/" + "/".join(part for part in tail if part != path.anchor)
-    return str(Path(*tail))
-
-
-@dataclass(frozen=True)
-class RepairSkipMessage:
-    kind: str
-    message: str
-
-
-def repair_skip_message(reason: str) -> RepairSkipMessage:
-    # These messages are shown when option 2 has nothing to rename:
-    # no Canon files means there are no repair targets; no iPhone timezone means
-    # snapsync cannot know the local trip timezone; mixed iPhone timezones need
-    # the earlier user confirmation; invalid Canon home timezone means the
-    # configured fallback cannot be used; already-matching files need no change.
-    if reason == "No iPhone timezone offsets were found":
-        return RepairSkipMessage("warning", "No iPhone timezone sample found; no files renamed")
-    if reason == "Multiple iPhone timezone offsets were found":
-        return RepairSkipMessage("warning", "Multiple iPhone timezone samples found; no files renamed")
-    if reason.startswith("Canon home timezone is invalid"):
-        return RepairSkipMessage("warning", "Canon home timezone is invalid; no files renamed")
-    if reason == "Canon timezone already matches the iPhone offset":
-        return RepairSkipMessage(
-            "info",
-            "No Canon files available for timezone correction in this folder",
-        )
-    return RepairSkipMessage("warning", "No Canon timezone correction could be inferred")

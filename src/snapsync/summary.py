@@ -25,8 +25,6 @@ class RunSummary:
     duplicates_repeated_in_source: int = 0
     filename_collisions_handled: int = 0
     unknown_files: int = 0
-    files_to_rename: int = 0
-    files_renamed: int = 0
     errors: int = 0
     duplicate_groups_report: Path | None = None
     output_folders: dict[str, set[Path]] = field(default_factory=dict)
@@ -37,10 +35,6 @@ class RunSummary:
         self.output_folders.setdefault(media_type, set()).add(destination.parent)
 
     def print(self) -> None:
-        if self.action_label == "rename":
-            self._print_timezone_repair_summary()
-            return
-
         sections = [
             (
                 "Scanned",
@@ -112,16 +106,6 @@ class RunSummary:
                 f"{color}{str(value).rjust(value_width)}{RESET} |"
             )
         print(border)
-
-    def _print_timezone_repair_summary(self) -> None:
-        print("")
-        print(f"{BOLD}{BLUE}Timezone Repair Summary{RESET}")
-        print(f"{BLUE}-----------------------{RESET}")
-        print(f"Files scanned: {self.source_files_found}")
-        print(f"Canon files found: {self.files_to_rename}")
-        print(f"Canon files renamed: {self.files_renamed}")
-        print(f"Skipped: {self.duplicate_files_skipped}")
-        print(f"Errors: {self.errors}")
 
     def _print_output_folders(self) -> None:
         if not self.output_folders:

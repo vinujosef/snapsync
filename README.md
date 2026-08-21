@@ -20,7 +20,7 @@ preserves filename conflicts, and prints a run summary.
 - Preserve filename conflicts with `_collision-01`.
 - Continue after individual file errors.
 - Read metadata with ExifTool in batches, with safe fallbacks for unreadable files.
-- Apply Canon timezone correction only after you type `yes`.
+- Apply timezone correction only after you type `yes`.
 - Preserve file modified timestamps during audit metadata repairs.
 
 ## Install
@@ -48,20 +48,13 @@ snapsync
 Choose an action:
 
 ```text
-1. Media copy + filename fix
-2. Fix Canon timezone issue in this folder
-3. Audit files in this folder
-4. Fix audit issues in this folder
+1. Audit files in this folder
+2. Fix audit issues in this folder
+3. Rename + copy
 q. Quit
 ```
 
-Option `1` copies media into `DESTINATION_FOLDER`.
-
-Option `2` recursively scans the current folder and renames affected Canon
-files in place. It does not copy files, move files to another root, or edit
-embedded metadata.
-
-Option `3` recursively scans the current folder and prints the number of files
+Option `1` recursively scans the current folder and prints the number of files
 found, the audit rules, a compact details table, and an issue summary at the
 end.
 Media rows are ordered by taken date/time, then filename, with divider lines
@@ -78,7 +71,7 @@ The timestamp source is shown in yellow when it is not `DateTimeOriginal`.
 When a row has a red warning, that file's name is shown in red too. When the
 only warning is the timestamp source, that file's name is shown in yellow.
 
-Option `4` scans the current folder for audit issues, shows issue counts, and
+Option `2` scans the current folder for audit issues, shows issue counts, and
 lets you choose one issue type to fix. Timezone fixes set Helsinki's expected
 offset for each file's date; the preview table shows each file's date, time,
 device, current offset, new offset, and action before confirmation. The same
@@ -96,11 +89,13 @@ Manual date/time edits also write the existing timezone offset fields when an
 offset is known, so the local computer timezone is not introduced during repair.
 When video metadata contains both a local-machine `DateTimeOriginal` offset and
 a timezone-aware `CreationDate`, snapsync uses the `CreationDate` offset.
-Option `4` also includes a manual one-file editor. Enter a filename, then choose
+Option `2` also includes a manual one-file editor. Enter a filename, then choose
 whether to edit its date, time, offset, or device metadata. The manual editor
 uses step markers (`i.`, `ii.`, `iii.`) and shows the selected file's current
-metadata in a one-row table before asking what to change. Option `4` repair
+metadata in a one-row table before asking what to change. Option `2` repair
 subflows use the same step-marker style.
+
+Option `3` renames files and copies media into `DESTINATION_FOLDER`.
 
 Audit without copying:
 

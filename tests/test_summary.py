@@ -7,29 +7,6 @@ from snapsync.summary import RunSummary
 
 
 class SummaryTests(unittest.TestCase):
-    def test_timezone_repair_summary_is_compact(self):
-        summary = RunSummary(
-            source_files_found=689,
-            files_renamed=240,
-            duplicate_files_skipped=0,
-            files_to_rename=240,
-            errors=0,
-            action_label="rename",
-        )
-        output = StringIO()
-
-        with redirect_stdout(output):
-            summary.print()
-
-        text = _strip_colors(output.getvalue())
-        self.assertIn("Timezone Repair Summary", text)
-        self.assertIn("Files scanned: 689", text)
-        self.assertIn("Canon files found: 240", text)
-        self.assertIn("Canon files renamed: 240", text)
-        self.assertIn("Skipped: 0", text)
-        self.assertIn("Errors: 0", text)
-        self.assertNotIn("Duplicate Details", text)
-
     def test_copy_summary_lists_written_folders_by_media_type(self):
         summary = RunSummary(copied_files=3)
         summary.record_output_folder(

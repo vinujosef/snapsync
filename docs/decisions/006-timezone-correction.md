@@ -11,12 +11,12 @@ folders that sort one hour apart.
 
 ## Final Choice
 
-snapsync may infer the destination timezone from iPhone photo metadata, then
-apply a Canon timestamp correction only after explicit confirmation.
+During copy, snapsync may infer the destination timezone from iPhone photo
+metadata, then apply a Canon timestamp correction only after explicit
+confirmation.
 
-During copy, the correction affects generated filenames and destination folders.
-During timezone repair, the correction renames existing Canon files in the
-current folder tree.
+The correction affects generated filenames and destination folders for the copy
+run.
 
 The correction does not edit embedded metadata.
 
@@ -33,9 +33,8 @@ The correction does not edit embedded metadata.
   exact timestamp shift before applying anything.
 - Require the user to type `yes`.
 - If confirmation is unavailable or not given, leave Canon timestamps unchanged.
-- Offer timezone repair as a separate interactive action.
-- Repair recursively scans the current folder and renames Canon files in place.
-- Repair does not copy files to `DESTINATION_FOLDER`.
+- Standalone Canon timezone repair is not offered as a separate interactive
+  action; audit-based metadata repair is handled by the audit fix workflow.
 
 ## Configuration
 

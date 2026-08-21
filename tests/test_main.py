@@ -10,7 +10,6 @@ from snapsync.constants import (
     ACTION_AUDIT_FOLDER,
     ACTION_COPY,
     ACTION_FIX_AUDIT_ISSUES,
-    ACTION_REPAIR_TIMEZONE,
 )
 from snapsync.main import _format_duration, main
 
@@ -36,7 +35,6 @@ class MainTests(unittest.TestCase):
     def test_prints_run_time_for_each_interactive_action(self):
         action_cases = (
             (ACTION_COPY, "run_media_copy"),
-            (ACTION_REPAIR_TIMEZONE, "run_timezone_repair"),
             (ACTION_AUDIT_FOLDER, "run_folder_audit"),
             (ACTION_FIX_AUDIT_ISSUES, "run_audit_issue_fix"),
         )

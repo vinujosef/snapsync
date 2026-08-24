@@ -37,9 +37,9 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["1", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     return_value=Metadata(
                         selected_datetime=datetime(2026, 4, 19, 10, 38, 13),
                         timestamp_field="DateTimeOriginal",
@@ -109,9 +109,9 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["1", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     side_effect=[
                         metadata_by_path[video],
                         Metadata(
@@ -171,12 +171,12 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["1", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run"),
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run"),
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     return_value=metadata_by_path[photo],
                 ),
-                patch("snapsync.actions.fix_audit_issues.logger.error") as error,
+                patch("snapsync.actions.fix_audit_issues_prompts.logger.error") as error,
                 redirect_stdout(output),
             ):
                 exit_code = run_audit_issue_fix(root, settings)
@@ -210,7 +210,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["1", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
                 exit_code = run_audit_issue_fix(root, settings)
@@ -243,7 +243,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["1", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
                 exit_code = run_audit_issue_fix(root, settings)
@@ -276,7 +276,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["2", "b", "Canon EOS M50", ""]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
                 exit_code = run_audit_issue_fix(root, settings)
@@ -328,7 +328,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["2", "", "", ""]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
                 exit_code = run_audit_issue_fix(root, settings)
@@ -358,7 +358,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["2", "a"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
                 exit_code = run_audit_issue_fix(root, settings)
@@ -400,9 +400,9 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "d", "b", "Canon EOS M50", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     return_value=Metadata(
                         selected_datetime=datetime(2026, 1, 5, 12, 0, 0),
                         timestamp_field="DateTimeOriginal",
@@ -455,9 +455,9 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "c", "+03:00", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     return_value=Metadata(
                         selected_datetime=datetime(2026, 1, 5, 12, 0, 0),
                         timestamp_field="DateTimeOriginal",
@@ -491,9 +491,9 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "a", "2026-02-06", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     return_value=Metadata(
                         selected_datetime=datetime(2026, 2, 6, 12, 0, 0),
                         timestamp_field="DateTimeOriginal",
@@ -554,9 +554,9 @@ class FixAuditIssuesTests(unittest.TestCase):
                     "builtins.input",
                     side_effect=["3", "0871a475-a7c9-4090-bc6e-68c47ca1ff4f.MP4", "a", "2026-05-02", "yes"],
                 ),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     return_value=Metadata(
                         selected_datetime=datetime(2026, 5, 2, 12, 15, 45),
                         timestamp_field="DateTimeOriginal",
@@ -615,9 +615,9 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["3", "1911202200134_encoded.mp4", "a", "2022-11-19", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     return_value=Metadata(
                         selected_datetime=datetime(2022, 11, 19, 2, 0, 34),
                         timestamp_field="DateTimeOriginal",
@@ -663,9 +663,9 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "b", "13:14:15", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run"),
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run"),
                 patch(
-                    "snapsync.actions.fix_audit_issues.extract_metadata",
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
                     return_value=Metadata(
                         selected_datetime=datetime(2026, 1, 5, 13, 14, 15),
                         timestamp_field="DateTimeOriginal",
@@ -707,7 +707,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["3", "same.jpg", "2", "d", "a", "yes"]),
-                patch("snapsync.actions.fix_audit_issues.subprocess.run") as run,
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
                 exit_code = run_audit_issue_fix(root, settings)
@@ -736,7 +736,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 ),
                 patch("sys.stdin.isatty", return_value=True),
                 patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "a", "02-06-2026"]),
-                patch("snapsync.actions.fix_audit_issues.logger.error") as error,
+                patch("snapsync.actions.fix_audit_issues_prompts.logger.error") as error,
                 redirect_stdout(output),
             ):
                 exit_code = run_audit_issue_fix(root, settings)

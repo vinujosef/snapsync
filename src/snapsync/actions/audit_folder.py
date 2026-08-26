@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timedelta
 from pathlib import Path
 import re
-from zoneinfo import ZoneInfo
 
 from config.settings import Settings
 from snapsync.metadata import Metadata, TIMESTAMP_FIELDS
+from snapsync.metadata_audit import (
+    helsinki_rule_line,
+    metadata_warnings,
+    metadata_years,
+    timezone_has_warning,
+)
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.scanner import scan_source
 from snapsync.util import logger
@@ -67,27 +71,12 @@ def _metadata_row(path: Path, metadata: Metadata) -> list[str]:
 
 
 def _file_cell(path: Path, metadata: Metadata) -> str:
-    warnings = _metadata_warnings(metadata)
+    warnings = metadata_warnings(metadata)
     if warnings & {"timezone", "device"}:
         return _error_color(path.name)
     if "timestamp" in warnings:
         return _warning_color(path.name)
     return path.name
-
-
-def _metadata_has_warning(metadata: Metadata) -> bool:
-    return bool(_metadata_warnings(metadata))
-
-
-def _metadata_warnings(metadata: Metadata) -> set[str]:
-    warnings: set[str] = set()
-    if metadata.timestamp_field != "DateTimeOriginal":
-        warnings.add("timestamp")
-    if metadata.device_name == "UnknownDevice":
-        warnings.add("device")
-    if _timezone_has_warning(metadata):
-        warnings.add("timezone")
-    return warnings
 
 
 def _timestamp_field_cell(metadata: Metadata) -> str:
@@ -103,17 +92,9 @@ def _device_cell(metadata: Metadata) -> str:
 
 
 def _timezone_cell(metadata: Metadata) -> str:
-    if _timezone_has_warning(metadata):
+    if timezone_has_warning(metadata):
         return _error_color(metadata.timezone_offset or "(none)")
     return metadata.timezone_offset or "(none)"
-
-
-def _timezone_has_warning(metadata: Metadata) -> bool:
-    if not metadata.timezone_offset:
-        return True
-
-    expected_offset = _offset_at(metadata.selected_datetime, ZoneInfo("Europe/Helsinki"))
-    return metadata.timezone_offset != expected_offset
 
 
 def _print_info_section(file_count: int) -> None:
@@ -126,65 +107,22 @@ def _print_info_section(file_count: int) -> None:
 def _print_rules_section(metadata_by_path: dict[Path, Metadata]) -> None:
     _print_section_heading("Rules")
     print(_info_color("Timezone baseline: Europe/Helsinki"))
-    for year in _metadata_years(metadata_by_path):
-        print(_info_color(_helsinki_rule_line(year)))
+    for year in metadata_years(metadata_by_path):
+        print(_info_color(helsinki_rule_line(year)))
     print(_info_color(f"Timestamp priority: {' > '.join(TIMESTAMP_FIELDS)}"))
-
-
-def _metadata_years(metadata_by_path: dict[Path, Metadata]) -> list[int]:
-    return sorted({metadata.selected_datetime.year for metadata in metadata_by_path.values()})
 
 
 def _print_issues_section(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> None:
     warning_counts: Counter[str] = Counter()
 
     for path in candidates:
-        warnings = _metadata_warnings(metadata_by_path[path])
+        warnings = metadata_warnings(metadata_by_path[path])
         warning_counts.update(warnings)
 
     _print_section_heading("Issue(s)")
     print(_info_color(f"Timezone mismatch/missing: {warning_counts['timezone']}"))
     print(_info_color(f"Timestamp not DateTimeOriginal: {warning_counts['timestamp']}"))
     print(_info_color(f"Unknown device: {warning_counts['device']}"))
-
-
-def _helsinki_rule_line(year: int) -> str:
-    zone = ZoneInfo("Europe/Helsinki")
-    start, end = _dst_transition_dates(year, zone)
-    return (
-        f"Helsinki {year}: {_offset_at(start, zone)} from {start:%Y-%m-%d}, "
-        f"{_offset_at(end, zone)} from {end:%Y-%m-%d}"
-    )
-
-
-def _dst_transition_dates(year: int, zone: ZoneInfo) -> tuple[datetime, datetime]:
-    transitions: list[datetime] = []
-    previous = datetime(year, 1, 1, 12, tzinfo=zone).utcoffset()
-    day = datetime(year, 1, 2, 12)
-    end = datetime(year + 1, 1, 1, 12)
-
-    while day < end:
-        current = day.replace(tzinfo=zone).utcoffset()
-        if current != previous:
-            transitions.append(day)
-        previous = current
-        day += timedelta(days=1)
-
-    if len(transitions) < 2:
-        raise ValueError(f"Could not find Helsinki daylight saving dates for {year}")
-    return transitions[0], transitions[1]
-
-
-def _offset_at(day: datetime, zone: ZoneInfo) -> str:
-    offset = day.replace(tzinfo=zone).utcoffset()
-    if offset is None:
-        return "(unknown)"
-
-    total_minutes = int(offset.total_seconds() // 60)
-    sign = "+" if total_minutes >= 0 else "-"
-    total_minutes = abs(total_minutes)
-    hours, minutes = divmod(total_minutes, 60)
-    return f"{sign}{hours:02d}:{minutes:02d}"
 
 
 def _info_color(value: str) -> str:

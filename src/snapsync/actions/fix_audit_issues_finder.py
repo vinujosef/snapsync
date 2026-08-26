@@ -4,10 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-from snapsync.actions.audit_folder import _metadata_warnings, _offset_at
 from snapsync.metadata import Metadata
+from snapsync.metadata_audit import expected_helsinki_offset, metadata_warnings
 
 
 @dataclass(frozen=True)
@@ -30,11 +29,10 @@ class DeviceFix:
 
 def timezone_fixes(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[TimezoneFix]:
     fixes: list[TimezoneFix] = []
-    zone = ZoneInfo("Europe/Helsinki")
 
     for path in candidates:
         metadata = metadata_by_path[path]
-        if "timezone" not in _metadata_warnings(metadata):
+        if "timezone" not in metadata_warnings(metadata):
             continue
 
         # Store everything the preview needs so the prompt layer stays simple.
@@ -44,7 +42,7 @@ def timezone_fixes(candidates: list[Path], metadata_by_path: dict[Path, Metadata
                 selected_datetime=metadata.selected_datetime,
                 device_name=metadata.device_name,
                 current_offset=metadata.timezone_offset or "(none)",
-                expected_offset=_offset_at(metadata.selected_datetime, zone),
+                expected_offset=expected_helsinki_offset(metadata.selected_datetime),
             )
         )
 
@@ -56,7 +54,7 @@ def unknown_device_files(candidates: list[Path], metadata_by_path: dict[Path, Me
 
     for path in candidates:
         metadata = metadata_by_path[path]
-        if "device" not in _metadata_warnings(metadata):
+        if "device" not in metadata_warnings(metadata):
             continue
 
         # Keep the displayed metadata beside the path so later code does not

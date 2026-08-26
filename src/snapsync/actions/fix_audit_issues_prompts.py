@@ -13,7 +13,6 @@ from snapsync.actions.audit_folder import (
     RESET,
     YELLOW,
     _format_table_row,
-    _helsinki_rule_line,
     _info_color,
     _print_section_heading,
     _visible_len,
@@ -28,6 +27,7 @@ from snapsync.actions.fix_audit_issues_writer import (
     write_timezone_offset,
 )
 from snapsync.metadata import Metadata, TIMESTAMP_FIELDS, parse_timezone_offset_minutes
+from snapsync.metadata_audit import helsinki_rule_line
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.util import logger
 
@@ -779,7 +779,7 @@ def _print_timezone_rules(fixes: list[TimezoneFix]) -> None:
     _print_section_heading("Rules")
     print(_info_color("Timezone baseline: Europe/Helsinki"))
     for year in sorted({fix.selected_datetime.year for fix in fixes}):
-        print(_info_color(_helsinki_rule_line(year)))
+        print(_info_color(helsinki_rule_line(year)))
     print(_info_color(f"Timestamp priority: {' > '.join(TIMESTAMP_FIELDS)}"))
 
 

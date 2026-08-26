@@ -14,6 +14,7 @@ from snapsync.renamer import generate_filename
 from snapsync.scanner import scan_source
 from snapsync.summary import RunSummary
 from snapsync.util import logger
+from snapsync.util.console import format_table_row, table_widths
 
 
 @dataclass(frozen=True)
@@ -131,28 +132,17 @@ def _print_rename_table(changes: list[RenameChange]) -> None:
         [str(index), change.old_name, change.new_name]
         for index, change in enumerate(changes, start=1)
     ]
-    widths = [
-        max(len(row[index]) for row in [headers, *rows])
-        for index in range(len(headers))
-    ]
-    print(_format_table_row(headers, widths))
-    print(_format_table_row(["-" * width for width in widths], widths))
-    row_width = len(_format_table_row(headers, widths))
+    widths = table_widths(headers, rows)
+    print(format_table_row(headers, widths))
+    print(format_table_row(["-" * width for width in widths], widths))
+    row_width = len(format_table_row(headers, widths))
     previous_date: str | None = None
     for row in rows:
         change_date = changes[int(row[0]) - 1].taken_date
         if previous_date is not None and change_date != previous_date:
             print("-" * row_width)
-        print(_format_table_row(row, widths))
+        print(format_table_row(row, widths))
         previous_date = change_date
-
-
-def _format_table_row(values: list[str], widths: list[int]) -> str:
-    cells = [
-        value + (" " * (widths[index] - len(value)))
-        for index, value in enumerate(values)
-    ]
-    return f"| {' | '.join(cells)} |"
 
 
 def _confirm_rename(settings: Settings) -> bool:

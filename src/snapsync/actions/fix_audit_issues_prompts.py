@@ -7,16 +7,6 @@ from pathlib import Path
 from typing import Callable
 
 from config.settings import Settings
-from snapsync.actions.audit_folder import (
-    CYAN,
-    RED,
-    RESET,
-    YELLOW,
-    _format_table_row,
-    _info_color,
-    _print_section_heading,
-    _visible_len,
-)
 from snapsync.actions.fix_audit_issues_finder import DeviceFix, TimezoneFix
 from snapsync.actions.fix_audit_issues_writer import (
     verify_datetime,
@@ -30,9 +20,7 @@ from snapsync.metadata import Metadata, TIMESTAMP_FIELDS, parse_timezone_offset_
 from snapsync.metadata_audit import helsinki_rule_line
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.util import logger
-
-
-GREEN = "\033[32m"
+from snapsync.util.console import cyan, green, print_section_heading, print_table, red, yellow
 
 
 @dataclass(frozen=True)
@@ -42,7 +30,7 @@ class DeviceChoice:
 
 
 def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count: int) -> None:
-    _print_section_heading("Issue(s)")
+    print_section_heading("Issue(s)")
     _print_table(
         ["Option", "Issue", "Files"],
         [
@@ -59,7 +47,7 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count:
 
 
 def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int:
-    _print_section_heading("Timezone Offset Fix Preview")
+    print_section_heading("Timezone Offset Fix Preview")
     _print_dry_run_notice(settings)
     if not fixes:
         print("No timezone offsets need fixing.")
@@ -105,7 +93,7 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
 
 
 def run_unknown_device_fix(files: list[DeviceFix], settings: Settings) -> int:
-    _print_section_heading("Unknown Device Fix")
+    print_section_heading("Unknown Device Fix")
     _print_dry_run_notice(settings)
     if not files:
         print("No unknown devices need fixing.")
@@ -137,7 +125,7 @@ def run_manual_file_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    _print_section_heading("Manual Metadata Fix")
+    print_section_heading("Manual Metadata Fix")
     _print_dry_run_notice(settings)
     filename = _step_input("i.", "Enter filename")
     if not filename:
@@ -181,7 +169,7 @@ def run_bulk_metadata_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    _print_section_heading("Bulk Metadata Repair")
+    print_section_heading("Bulk Metadata Repair")
     _print_dry_run_notice(settings)
     if not candidates:
         print("No files found to fix.")
@@ -217,7 +205,7 @@ def run_batch_metadata_repair(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    _print_section_heading("Batch Repair Date / Time / Timezone / Device")
+    print_section_heading("Batch Repair Date / Time / Timezone / Device")
     _print_dry_run_notice(settings)
     if not candidates:
         print("No files found to fix.")
@@ -619,10 +607,10 @@ def _write_bulk_changes(
             logger.error(f"Could not update metadata for {path.name}: {exc}")
 
     if settings.dry_run:
-        _print_section_heading("Dry Run Metadata Preview")
+        print_section_heading("Dry Run Metadata Preview")
         print("DRY RUN: no metadata was written.")
     else:
-        _print_section_heading("Updated Metadata")
+        print_section_heading("Updated Metadata")
 
     if not settings.dry_run and changed_paths:
         # Read once in batch after the writes. This is much faster than starting
@@ -715,7 +703,7 @@ def _metadata_matches_device_filter(
 
 
 def _print_bulk_preview(title: str, headers: list[str], rows: list[list[str]]) -> None:
-    _print_section_heading(title)
+    print_section_heading(title)
     print("Previewing affected files")
     print()
     _print_table(headers, _color_preview_rows(headers, rows))
@@ -733,15 +721,15 @@ def _sort_candidates(candidates: list[Path], metadata_by_path: dict[Path, Metada
 
 
 def _changed_color(value: str) -> str:
-    return f"{YELLOW}{value}{RESET}"
+    return yellow(value)
 
 
 def _old_value_color(value: str) -> str:
-    return f"{RED}{value}{RESET}"
+    return red(value)
 
 
 def _new_value_color(value: str) -> str:
-    return f"{GREEN}{value}{RESET}"
+    return green(value)
 
 
 def _color_preview_rows(headers: list[str], rows: list[list[str]]) -> list[list[str]]:
@@ -776,11 +764,11 @@ def _metadata_confirmation_prompt(settings: Settings) -> str:
 
 
 def _print_timezone_rules(fixes: list[TimezoneFix]) -> None:
-    _print_section_heading("Rules")
-    print(_info_color("Timezone baseline: Europe/Helsinki"))
+    print_section_heading("Rules")
+    print(cyan("Timezone baseline: Europe/Helsinki"))
     for year in sorted({fix.selected_datetime.year for fix in fixes}):
-        print(_info_color(helsinki_rule_line(year)))
-    print(_info_color(f"Timestamp priority: {' > '.join(TIMESTAMP_FIELDS)}"))
+        print(cyan(helsinki_rule_line(year)))
+    print(cyan(f"Timestamp priority: {' > '.join(TIMESTAMP_FIELDS)}"))
 
 
 def _print_device_fix_metadata(fix: DeviceFix) -> None:
@@ -989,7 +977,7 @@ def _print_step(marker: str, text: str) -> None:
 
 
 def _step_color(value: str) -> str:
-    return f"{CYAN}{value}{RESET}"
+    return cyan(value)
 
 
 def _action_label(label: str, settings: Settings) -> str:
@@ -1007,11 +995,4 @@ def _completion_label(label: str, settings: Settings) -> str:
 
 
 def _print_table(headers: list[str], rows: list[list[str]]) -> None:
-    widths = [
-        max(_visible_len(row[index]) for row in [headers, *rows])
-        for index in range(len(headers))
-    ]
-    print(_format_table_row(headers, widths))
-    print(_format_table_row(["-" * width for width in widths], widths))
-    for row in rows:
-        print(_format_table_row(row, widths))
+    print_table(headers, rows)

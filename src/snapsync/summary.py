@@ -4,14 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
-RESET = "\033[0m"
-BOLD = "\033[1m"
-BLUE = "\033[34m"
-CYAN = "\033[36m"
-GREEN = "\033[32m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
+from snapsync.util.console import BLUE, BOLD, CYAN, GREEN, RED, RESET, YELLOW
 
 
 @dataclass

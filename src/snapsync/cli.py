@@ -16,12 +16,7 @@ from snapsync.timezone_correction import (
     TimezoneCorrectionPlan,
     describe_shift,
 )
-
-
-RESET = "\033[0m"
-BOLD = "\033[1m"
-BLUE = "\033[34m"
-CYAN = "\033[36m"
+from snapsync.util.console import blue, cyan
 
 
 def choose_interactive_action() -> str:
@@ -101,16 +96,3 @@ class ProgressHeartbeat:
 def _print_action_heading(title: str) -> None:
     print(cyan(title, bold=True))
     print(cyan("-" * len(title)))
-
-
-def blue(text: str, *, bold: bool = False) -> str:
-    return _color(text, BLUE, bold)
-
-
-def cyan(text: str, *, bold: bool = False) -> str:
-    return _color(text, CYAN, bold)
-
-
-def _color(text: str, color: str, bold: bool) -> str:
-    prefix = f"{BOLD}{color}" if bold else color
-    return f"{prefix}{text}{RESET}"

@@ -840,6 +840,52 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("| wrong-offset.jpg | +02:00     | +05:30     |", text)
             self.assertIn("| wrong-offset.jpg | 2026-01-05 | 12:00:00 | DateTimeOriginal | \033[33m+05:30\033[0m | UnknownDevice |", text)
 
+    def test_bulk_timezone_fix_reads_metadata_back_in_one_batch_after_writes(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            first = root / "first.jpg"
+            second = root / "second.jpg"
+            first.write_bytes(b"photo")
+            second.write_bytes(b"photo")
+            settings = _settings(root, dry_run=False)
+            output = StringIO()
+
+            metadata_by_path = {
+                first: _unknown_device_metadata(),
+                second: _unknown_device_metadata_at(datetime(2026, 1, 5, 12, 1, 0)),
+            }
+            final_metadata_by_path = {
+                path: Metadata(
+                    selected_datetime=metadata.selected_datetime,
+                    timestamp_field=metadata.timestamp_field,
+                    device_name=metadata.device_name,
+                    quality=metadata.quality,
+                    timezone_offset="+05:30",
+                )
+                for path, metadata in metadata_by_path.items()
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch(
+                    "snapsync.actions.fix_audit_issues_prompts.read_metadata_batch_or_fallback",
+                    return_value=final_metadata_by_path,
+                ) as readback,
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["4", "3", "+05:30", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_prompts.write_timezone_offset") as write_timezone_offset,
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(write_timezone_offset.call_count, 2)
+            readback.assert_called_once_with([first, second], settings)
+            self.assertIn("Updated Metadata", output.getvalue())
+
     def test_bulk_device_fix_previews_change_and_highlights_final_device(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

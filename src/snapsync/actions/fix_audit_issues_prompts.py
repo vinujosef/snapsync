@@ -19,7 +19,6 @@ from snapsync.actions.audit_folder import (
 )
 from snapsync.actions.fix_audit_issues_finder import DeviceFix, TimezoneFix
 from snapsync.actions.fix_audit_issues_writer import (
-    read_metadata_after_write,
     verify_datetime,
     verify_device_model,
     verify_timezone_offset,
@@ -28,6 +27,7 @@ from snapsync.actions.fix_audit_issues_writer import (
     write_timezone_offset,
 )
 from snapsync.metadata import Metadata, TIMESTAMP_FIELDS, parse_timezone_offset_minutes
+from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.util import logger
 
 
@@ -232,7 +232,6 @@ def _run_bulk_date_fix(
         new_datetime = datetime.combine(new_date, metadata.selected_datetime.time())
         if not settings.dry_run:
             write_datetime(path, new_datetime, metadata.timezone_offset, settings)
-            verify_datetime(path, new_datetime, metadata.timezone_offset, settings)
         return replace(metadata, selected_datetime=new_datetime)
 
     return _write_bulk_changes(changes, metadata_by_path, settings, "Date", apply)
@@ -264,7 +263,6 @@ def _run_bulk_time_fix(
         new_datetime = datetime.combine(metadata.selected_datetime.date(), new_time)
         if not settings.dry_run:
             write_datetime(path, new_datetime, metadata.timezone_offset, settings)
-            verify_datetime(path, new_datetime, metadata.timezone_offset, settings)
         return replace(metadata, selected_datetime=new_datetime)
 
     return _write_bulk_changes(changes, metadata_by_path, settings, "Time", apply)
@@ -293,7 +291,6 @@ def _run_bulk_timezone_fix(
     def apply(path: Path, metadata: Metadata) -> Metadata:
         if not settings.dry_run:
             write_timezone_offset(path, new_offset, settings)
-            verify_timezone_offset(path, new_offset, settings)
         return replace(metadata, timezone_offset=new_offset)
 
     return _write_bulk_changes(changes, metadata_by_path, settings, "Offset", apply)
@@ -324,7 +321,6 @@ def _run_bulk_device_fix(
     def apply(path: Path, metadata: Metadata) -> Metadata:
         if not settings.dry_run:
             write_device_model(path, device_choice.name, settings)
-            verify_device_model(path, device_choice.name, settings)
         return replace(metadata, device_name=device_choice.name)
 
     return _write_bulk_changes(changes, metadata_by_path, settings, "Device", apply)
@@ -339,15 +335,18 @@ def _write_bulk_changes(
 ) -> int:
     errors = 0
     final_rows: list[list[str]] = []
+    changed_paths: list[Path] = []
+    planned_metadata_by_path: dict[Path, Metadata] = {}
 
     for path in changes:
         metadata = metadata_by_path[path]
         try:
-            # In dry-run mode, show the metadata as it would look after the fix.
+            # In dry-run mode, this returns the metadata as it would look after
+            # the fix. In real mode, it performs the write and returns the same
+            # planned shape so we can remember which files succeeded.
             final_metadata = apply_change(path, metadata)
-            if not settings.dry_run:
-                final_metadata = read_metadata_after_write(path, settings)
-            final_rows.append(_metadata_readback_row(path, final_metadata, changed_field))
+            changed_paths.append(path)
+            planned_metadata_by_path[path] = final_metadata
         except Exception as exc:
             errors += 1
             logger.error(f"Could not update metadata for {path.name}: {exc}")
@@ -357,6 +356,26 @@ def _write_bulk_changes(
         print("DRY RUN: no metadata was written.")
     else:
         _print_section_heading("Updated Metadata")
+
+    if not settings.dry_run and changed_paths:
+        # Read once in batch after the writes. This is much faster than starting
+        # exiftool again for every single file.
+        read_metadata_by_path = read_metadata_batch_or_fallback(changed_paths, settings)
+        verified_paths: list[Path] = []
+        for path in changed_paths:
+            planned_metadata = planned_metadata_by_path[path]
+            read_metadata = read_metadata_by_path[path]
+            if not _bulk_change_was_written(read_metadata, planned_metadata, changed_field):
+                errors += 1
+                logger.error(f"Metadata readback did not match planned {changed_field.lower()} for {path.name}")
+                continue
+            planned_metadata_by_path[path] = read_metadata
+            verified_paths.append(path)
+        changed_paths = verified_paths
+
+    for path in changed_paths:
+        final_rows.append(_metadata_readback_row(path, planned_metadata_by_path[path], changed_field))
+
     if final_rows:
         _print_table(["Filename", "Date", "Time", "Taken From", "Offset", "Device"], final_rows)
     else:
@@ -384,6 +403,20 @@ def _metadata_readback_row(path: Path, metadata: Metadata, changed_field: str) -
         values["Offset"],
         values["Device"],
     ]
+
+
+def _bulk_change_was_written(read_metadata: Metadata, planned_metadata: Metadata, changed_field: str) -> bool:
+    # Use the one batch readback to confirm the value changed. This avoids a
+    # second exiftool read for every file.
+    if changed_field == "Date":
+        return read_metadata.selected_datetime.date() == planned_metadata.selected_datetime.date()
+    if changed_field == "Time":
+        return read_metadata.selected_datetime.time() == planned_metadata.selected_datetime.time()
+    if changed_field == "Offset":
+        return read_metadata.timezone_offset == planned_metadata.timezone_offset
+    if changed_field == "Device":
+        return read_metadata.device_name == planned_metadata.device_name
+    return True
 
 
 def _print_bulk_preview(title: str, headers: list[str], rows: list[list[str]]) -> None:

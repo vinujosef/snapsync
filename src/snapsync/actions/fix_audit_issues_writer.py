@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from config.settings import Settings
-from snapsync.metadata import Metadata, extract_metadata, parse_timezone_offset_minutes
+from snapsync.metadata import extract_metadata, parse_timezone_offset_minutes
 
 
 def write_timezone_offset(path: Path, offset: str, settings: Settings) -> None:
@@ -59,10 +59,6 @@ def verify_device_model(path: Path, device_name: str, settings: Settings) -> Non
     metadata = extract_metadata(path, settings.exiftool_path)
     if metadata.device_name != device_name:
         raise ValueError(f"metadata still reports {metadata.device_name}")
-
-
-def read_metadata_after_write(path: Path, settings: Settings) -> Metadata:
-    return extract_metadata(path, settings.exiftool_path)
 
 
 def write_datetime(

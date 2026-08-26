@@ -1,14 +1,16 @@
 # Print prompts and run the selected audit issue repair flow.
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time
 from pathlib import Path
+from typing import Callable
 
 from config.settings import Settings
 from snapsync.actions.audit_folder import (
     CYAN,
     RESET,
+    YELLOW,
     _format_table_row,
     _helsinki_rule_line,
     _info_color,
@@ -17,6 +19,7 @@ from snapsync.actions.audit_folder import (
 )
 from snapsync.actions.fix_audit_issues_finder import DeviceFix, TimezoneFix
 from snapsync.actions.fix_audit_issues_writer import (
+    read_metadata_after_write,
     verify_datetime,
     verify_device_model,
     verify_timezone_offset,
@@ -34,7 +37,7 @@ class DeviceChoice:
     used_custom_name: bool
 
 
-def print_issue_menu(timezone_count: int, unknown_device_count: int) -> None:
+def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count: int) -> None:
     _print_section_heading("Issue(s)")
     _print_table(
         ["Option", "Issue", "Files"],
@@ -42,6 +45,7 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int) -> None:
             ["1", "Timezone mismatch/missing", str(timezone_count)],
             ["2", "Unknown device", str(unknown_device_count)],
             ["3", "Edit one file manually", "-"],
+            ["4", "Bulk fix date / time / timezone / device", str(bulk_count)],
         ],
     )
     print("q. Back")
@@ -51,6 +55,7 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int) -> None:
 
 def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int:
     _print_section_heading("Timezone Offset Fix Preview")
+    _print_dry_run_notice(settings)
     if not fixes:
         print("No timezone offsets need fixing.")
         return 0
@@ -95,6 +100,7 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
 
 def run_unknown_device_fix(files: list[DeviceFix], settings: Settings) -> int:
     _print_section_heading("Unknown Device Fix")
+    _print_dry_run_notice(settings)
     if not files:
         print("No unknown devices need fixing.")
         return 0
@@ -126,6 +132,7 @@ def run_manual_file_fix(
     settings: Settings,
 ) -> int:
     _print_section_heading("Manual Metadata Fix")
+    _print_dry_run_notice(settings)
     filename = _step_input("i.", "Enter filename")
     if not filename:
         logger.info("No filename entered")
@@ -161,6 +168,256 @@ def run_manual_file_fix(
 
     logger.info("No manual metadata field selected")
     return 0
+
+
+def run_bulk_metadata_fix(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    _print_section_heading("Bulk Metadata Fix")
+    _print_dry_run_notice(settings)
+    if not candidates:
+        print("No files found to fix.")
+        return 0
+
+    _print_step("i.", "Choose bulk metadata to edit")
+    print("1. Bulk fix date")
+    print("2. Bulk fix time")
+    print("3. Bulk fix timezone")
+    print("4. Bulk fix device")
+    print()
+
+    choice = input("> ").strip().lower()
+    try:
+        if choice == "1":
+            return _run_bulk_date_fix(candidates, metadata_by_path, settings)
+        if choice == "2":
+            return _run_bulk_time_fix(candidates, metadata_by_path, settings)
+        if choice == "3":
+            return _run_bulk_timezone_fix(candidates, metadata_by_path, settings)
+        if choice == "4":
+            return _run_bulk_device_fix(candidates, metadata_by_path, settings)
+    except Exception as exc:
+        logger.error(f"Could not bulk update metadata: {exc}")
+        return 1
+
+    logger.info("No bulk metadata field selected")
+    return 0
+
+
+def _run_bulk_date_fix(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    value = _step_input("ii.", "Enter new date (YYYY-MM-DD)")
+    new_date = _parse_date(value)
+    changes = _sort_candidates(candidates, metadata_by_path)
+    rows = [
+        [
+            path.name,
+            metadata_by_path[path].selected_datetime.strftime("%Y-%m-%d"),
+            new_date.strftime("%Y-%m-%d"),
+        ]
+        for path in changes
+    ]
+
+    _print_bulk_preview("Date Fix Preview", ["Filename", "Old Date", "New Date"], rows)
+    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
+        logger.warning("Bulk date fix was not confirmed; no files were changed")
+        return 0
+
+    def apply(path: Path, metadata: Metadata) -> Metadata:
+        new_datetime = datetime.combine(new_date, metadata.selected_datetime.time())
+        if not settings.dry_run:
+            write_datetime(path, new_datetime, metadata.timezone_offset, settings)
+            verify_datetime(path, new_datetime, metadata.timezone_offset, settings)
+        return replace(metadata, selected_datetime=new_datetime)
+
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Date", apply)
+
+
+def _run_bulk_time_fix(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    value = _step_input("ii.", "Enter new time (HH:MM:SS)")
+    new_time = _parse_time(value)
+    changes = _sort_candidates(candidates, metadata_by_path)
+    rows = [
+        [
+            path.name,
+            metadata_by_path[path].selected_datetime.strftime("%H:%M:%S"),
+            new_time.strftime("%H:%M:%S"),
+        ]
+        for path in changes
+    ]
+
+    _print_bulk_preview("Time Fix Preview", ["Filename", "Old Time", "New Time"], rows)
+    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
+        logger.warning("Bulk time fix was not confirmed; no files were changed")
+        return 0
+
+    def apply(path: Path, metadata: Metadata) -> Metadata:
+        new_datetime = datetime.combine(metadata.selected_datetime.date(), new_time)
+        if not settings.dry_run:
+            write_datetime(path, new_datetime, metadata.timezone_offset, settings)
+            verify_datetime(path, new_datetime, metadata.timezone_offset, settings)
+        return replace(metadata, selected_datetime=new_datetime)
+
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Time", apply)
+
+
+def _run_bulk_timezone_fix(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    new_offset = _step_input("ii.", "Enter new offset (+HH:MM or -HH:MM)")
+    if parse_timezone_offset_minutes(new_offset) is None:
+        raise ValueError("offset must use +HH:MM or -HH:MM")
+
+    changes = _sort_candidates(candidates, metadata_by_path)
+    rows = [
+        [path.name, metadata_by_path[path].timezone_offset or "(none)", new_offset]
+        for path in changes
+    ]
+
+    _print_bulk_preview("Timezone Fix Preview", ["Filename", "Old Offset", "New Offset"], rows)
+    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
+        logger.warning("Bulk timezone fix was not confirmed; no files were changed")
+        return 0
+
+    def apply(path: Path, metadata: Metadata) -> Metadata:
+        if not settings.dry_run:
+            write_timezone_offset(path, new_offset, settings)
+            verify_timezone_offset(path, new_offset, settings)
+        return replace(metadata, timezone_offset=new_offset)
+
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Offset", apply)
+
+
+def _run_bulk_device_fix(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    device_choice = _choose_bulk_device_name()
+    if not device_choice:
+        print("Skipped bulk device fix")
+        return 0
+
+    changes = _sort_candidates(candidates, metadata_by_path)
+    rows = [
+        [path.name, metadata_by_path[path].device_name, device_choice.name]
+        for path in changes
+    ]
+
+    _print_bulk_preview("Device Fix Preview", ["Filename", "Old Device", "New Device"], rows)
+    confirmation_step = "iv." if device_choice.used_custom_name else "iii."
+    if not _confirm_step(confirmation_step, _metadata_confirmation_prompt(settings)):
+        logger.warning("Bulk device fix was not confirmed; no files were changed")
+        return 0
+
+    def apply(path: Path, metadata: Metadata) -> Metadata:
+        if not settings.dry_run:
+            write_device_model(path, device_choice.name, settings)
+            verify_device_model(path, device_choice.name, settings)
+        return replace(metadata, device_name=device_choice.name)
+
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Device", apply)
+
+
+def _write_bulk_changes(
+    changes: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+    changed_field: str,
+    apply_change: Callable[[Path, Metadata], Metadata],
+) -> int:
+    errors = 0
+    final_rows: list[list[str]] = []
+
+    for path in changes:
+        metadata = metadata_by_path[path]
+        try:
+            # In dry-run mode, show the metadata as it would look after the fix.
+            final_metadata = apply_change(path, metadata)
+            if not settings.dry_run:
+                final_metadata = read_metadata_after_write(path, settings)
+            final_rows.append(_metadata_readback_row(path, final_metadata, changed_field))
+        except Exception as exc:
+            errors += 1
+            logger.error(f"Could not update metadata for {path.name}: {exc}")
+
+    if settings.dry_run:
+        _print_section_heading("Dry Run Metadata Preview")
+        print("DRY RUN: no metadata was written.")
+    else:
+        _print_section_heading("Updated Metadata")
+    if final_rows:
+        _print_table(["Filename", "Date", "Time", "Taken From", "Offset", "Device"], final_rows)
+    else:
+        print("No metadata was updated.")
+    return 0 if errors == 0 else 1
+
+
+def _metadata_readback_row(path: Path, metadata: Metadata, changed_field: str) -> list[str]:
+    taken_at = metadata.selected_datetime
+    values = {
+        "Date": taken_at.strftime("%Y-%m-%d"),
+        "Time": taken_at.strftime("%H:%M:%S"),
+        "Taken From": metadata.timestamp_field,
+        "Offset": metadata.timezone_offset or "(none)",
+        "Device": metadata.device_name,
+    }
+    if changed_field in values:
+        values[changed_field] = _changed_color(values[changed_field])
+
+    return [
+        path.name,
+        values["Date"],
+        values["Time"],
+        values["Taken From"],
+        values["Offset"],
+        values["Device"],
+    ]
+
+
+def _print_bulk_preview(title: str, headers: list[str], rows: list[list[str]]) -> None:
+    _print_section_heading(title)
+    print("Previewing affected files")
+    print()
+    _print_table(headers, rows)
+
+
+def _sort_candidates(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[Path]:
+    return sorted(
+        candidates,
+        key=lambda path: (
+            metadata_by_path[path].selected_datetime,
+            path.name.lower(),
+            str(path).lower(),
+        ),
+    )
+
+
+def _changed_color(value: str) -> str:
+    return f"{YELLOW}{value}{RESET}"
+
+
+def _print_dry_run_notice(settings: Settings) -> None:
+    if settings.dry_run:
+        print("DRY RUN: no metadata will be written.")
+        print("DRY RUN: preview tables show planned values only.")
+
+
+def _metadata_confirmation_prompt(settings: Settings) -> str:
+    if settings.dry_run:
+        return "Type yes to preview dry-run metadata"
+    return "Type yes to write metadata"
 
 
 def _print_timezone_rules(fixes: list[TimezoneFix]) -> None:
@@ -335,6 +592,10 @@ def _choose_batch_device_name() -> DeviceChoice | None:
 
     print("Skipped: unknown choice")
     return None
+
+
+def _choose_bulk_device_name() -> DeviceChoice | None:
+    return _choose_batch_device_name()
 
 
 def _choose_manual_device_name() -> DeviceChoice | None:

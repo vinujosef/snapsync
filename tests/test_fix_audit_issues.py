@@ -68,7 +68,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 text=True,
             )
             text = output.getvalue()
-            self.assertIn("| 1      | Timezone mismatch/missing | 1     |", text)
+            self.assertIn("| 1      | Timezone mismatch/missing", text)
             self.assertIn("i.\033[0m Review timezone rules and preview:", text)
             self.assertIn("Rules:", text)
             self.assertIn("Timezone baseline: Europe/Helsinki", text)
@@ -217,6 +217,7 @@ class FixAuditIssuesTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             run.assert_not_called()
+            self.assertIn("DRY RUN: no metadata will be written.", output.getvalue())
             self.assertIn("Would update IMG_2026.JPG: (none) -> +03:00", output.getvalue())
 
     def test_timezone_fix_preview_orders_by_date_time_then_filename(self):
@@ -743,6 +744,132 @@ class FixAuditIssuesTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 1)
             error.assert_called_once()
+
+    def test_bulk_date_fix_previews_change_and_highlights_final_date(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "wrong-day.jpg"
+            photo.write_bytes(b"photo")
+            settings = _settings(root, dry_run=True)
+            output = StringIO()
+
+            metadata_by_path = {photo: _unknown_device_metadata()}
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["4", "1", "2026-08-26", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_prompts.write_datetime") as write_datetime,
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            text = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            write_datetime.assert_not_called()
+            self.assertIn("DRY RUN: no metadata will be written.", text)
+            self.assertIn("DRY RUN: preview tables show planned values only.", text)
+            self.assertIn("DRY RUN: no metadata was written.", text)
+            self.assertIn("| 4      | Bulk fix date / time / timezone / device | 1     |", text)
+            self.assertIn("| Filename      | Old Date   | New Date   |", text)
+            self.assertIn("| wrong-day.jpg | 2026-01-05 | 2026-08-26 |", text)
+            self.assertIn("| wrong-day.jpg | \033[33m2026-08-26\033[0m | 12:00:00 | DateTimeOriginal | +02:00 | UnknownDevice |", text)
+
+    def test_bulk_time_fix_previews_change_and_highlights_final_time(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "wrong-time.jpg"
+            photo.write_bytes(b"photo")
+            settings = _settings(root, dry_run=True)
+            output = StringIO()
+
+            metadata_by_path = {photo: _unknown_device_metadata()}
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["4", "2", "08:09:10", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_prompts.write_datetime") as write_datetime,
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            text = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            write_datetime.assert_not_called()
+            self.assertIn("DRY RUN: no metadata will be written.", text)
+            self.assertIn("DRY RUN: no metadata was written.", text)
+            self.assertIn("| Filename       | Old Time | New Time |", text)
+            self.assertIn("| wrong-time.jpg | 12:00:00 | 08:09:10 |", text)
+            self.assertIn("| wrong-time.jpg | 2026-01-05 | \033[33m08:09:10\033[0m | DateTimeOriginal | +02:00 | UnknownDevice |", text)
+
+    def test_bulk_timezone_fix_previews_change_and_highlights_final_offset(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "wrong-offset.jpg"
+            photo.write_bytes(b"photo")
+            settings = _settings(root, dry_run=True)
+            output = StringIO()
+
+            metadata_by_path = {photo: _unknown_device_metadata()}
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["4", "3", "+05:30", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_prompts.write_timezone_offset") as write_timezone_offset,
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            text = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            write_timezone_offset.assert_not_called()
+            self.assertIn("DRY RUN: no metadata will be written.", text)
+            self.assertIn("DRY RUN: no metadata was written.", text)
+            self.assertIn("| Filename         | Old Offset | New Offset |", text)
+            self.assertIn("| wrong-offset.jpg | +02:00     | +05:30     |", text)
+            self.assertIn("| wrong-offset.jpg | 2026-01-05 | 12:00:00 | DateTimeOriginal | \033[33m+05:30\033[0m | UnknownDevice |", text)
+
+    def test_bulk_device_fix_previews_change_and_highlights_final_device(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "wrong-device.jpg"
+            photo.write_bytes(b"photo")
+            settings = _settings(root, dry_run=True)
+            output = StringIO()
+
+            metadata_by_path = {photo: _unknown_device_metadata()}
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["4", "4", "b", "Canon EOS R50", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_prompts.write_device_model") as write_device_model,
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            text = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            write_device_model.assert_not_called()
+            self.assertIn("DRY RUN: no metadata will be written.", text)
+            self.assertIn("DRY RUN: no metadata was written.", text)
+            self.assertIn("| Filename         | Old Device    | New Device    |", text)
+            self.assertIn("| wrong-device.jpg | UnknownDevice | Canon EOS R50 |", text)
+            self.assertIn("| wrong-device.jpg | 2026-01-05 | 12:00:00 | DateTimeOriginal | +02:00 | \033[33mCanon EOS R50\033[0m |", text)
 
 
 def _unknown_device_metadata() -> Metadata:

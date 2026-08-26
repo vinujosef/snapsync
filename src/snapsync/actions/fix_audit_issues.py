@@ -8,6 +8,7 @@ from config.settings import Settings
 from snapsync.actions.fix_audit_issues_finder import timezone_fixes, unknown_device_files
 from snapsync.actions.fix_audit_issues_prompts import (
     print_issue_menu,
+    run_bulk_metadata_fix,
     run_manual_file_fix,
     run_timezone_offset_fix,
     run_unknown_device_fix,
@@ -29,7 +30,7 @@ def run_audit_issue_fix(source_folder: Path, settings: Settings) -> int:
     # does not change any files.
     timezone_fix_list = timezone_fixes(candidates, metadata_by_path)
     unknown_device_file_list = unknown_device_files(candidates, metadata_by_path)
-    print_issue_menu(len(timezone_fix_list), len(unknown_device_file_list))
+    print_issue_menu(len(timezone_fix_list), len(unknown_device_file_list), len(candidates))
 
     if not sys.stdin.isatty():
         print("No interactive input available; no audit issues fixed.")
@@ -42,6 +43,8 @@ def run_audit_issue_fix(source_folder: Path, settings: Settings) -> int:
         return run_unknown_device_fix(unknown_device_file_list, settings)
     if choice == "3":
         return run_manual_file_fix(source_folder, candidates, metadata_by_path, settings)
+    if choice == "4":
+        return run_bulk_metadata_fix(candidates, metadata_by_path, settings)
 
     logger.info("No audit issue fix selected")
     return 0

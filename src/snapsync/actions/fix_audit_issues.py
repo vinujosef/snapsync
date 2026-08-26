@@ -8,6 +8,7 @@ from config.settings import Settings
 from snapsync.actions.fix_audit_issues_finder import timezone_fixes, unknown_device_files
 from snapsync.actions.fix_audit_issues_prompts import (
     print_issue_menu,
+    run_batch_metadata_repair,
     run_bulk_metadata_fix,
     run_manual_file_fix,
     run_timezone_offset_fix,
@@ -45,6 +46,8 @@ def run_audit_issue_fix(source_folder: Path, settings: Settings) -> int:
         return run_manual_file_fix(source_folder, candidates, metadata_by_path, settings)
     if choice == "4":
         return run_bulk_metadata_fix(candidates, metadata_by_path, settings)
+    if choice == "5":
+        return run_batch_metadata_repair(candidates, metadata_by_path, settings)
 
     logger.info("No audit issue fix selected")
     return 0

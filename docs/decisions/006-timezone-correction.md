@@ -36,6 +36,29 @@ The correction does not edit embedded metadata.
 - Standalone Canon timezone repair is not offered as a separate interactive
   action; audit-based metadata repair is handled by the audit fix workflow.
 
+## Audit Metadata Repair
+
+The audit fix workflow offers both bulk and batch metadata repair. This is
+separate from copy-time Canon correction because it edits embedded metadata.
+
+Bulk repair changes every media file in the folder. Batch repair changes only
+files that match the user's filter. Bulk and batch timezone repair both move
+the clock time by the offset difference.
+
+For batch timezone repair, the user enters:
+
+- Current offset to match.
+- New offset to write.
+- Device-name filter.
+
+Only files whose current metadata offset exactly matches the current offset are
+changed. The file's device name must contain the device filter text too.
+
+Example: moving `+03:00` to `+05:30` with device filter `iPhone` changes an
+iPhone file from `2026-08-26 09:41:37 +03:00` to
+`2026-08-26 12:11:37 +05:30`. Canon files already at `+05:30` are skipped, and
+iPhone files already at `+05:30` are skipped.
+
 ## Configuration
 
 ```env

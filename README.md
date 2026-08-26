@@ -55,54 +55,35 @@ Choose an action:
 q. Quit
 ```
 
-Option `1` recursively scans the current folder and prints the number of files
-found, the audit rules, a compact details table, and an issue summary at the
-end.
-Media rows are ordered by taken date/time, then filename, with divider lines
-between date groups.
-The rules include the Helsinki baseline timezone, Helsinki daylight saving
-offset dates for years present in the audited files, and timestamp priority
-order.
-The audit info block is color-coded without using red or green.
-In the metadata table, a timezone is shown in red when it does not match the
-expected Helsinki offset for the file's taken date or when no timezone was
-found.
-The timestamp source is shown in yellow when it is not `DateTimeOriginal`.
-`UnknownDevice` is also shown in red.
-When a row has a red warning, that file's name is shown in red too. When the
-only warning is the timestamp source, that file's name is shown in yellow.
+- `1` Audit files:
+  Scans the folder and shows metadata, warnings, and issue counts.
+  Rows are ordered by taken date/time, then filename.
 
-Option `2` scans the current folder for audit issues, shows issue counts, and
-lets you choose one issue type to fix. Timezone fixes set Helsinki's expected
-offset for each file's date; the preview table shows each file's date, time,
-device, current offset, new offset, and action before confirmation. The same
-Helsinki timezone rules shown in the audit appear above the preview table.
-Unknown-device fixes prompt for a device model per file, with a shortcut for
-`WhatsApp`; each file is shown in a one-row metadata table before the device
-choice. The selected subflow exits when finished.
-Timezone and unknown-device fix lists are also ordered by taken date/time, then
-filename.
-For videos with no readable offset, timezone repair also writes a timezone-aware
-`CreationDate` and verifies that snapsync can read the expected offset back.
-Metadata repair writes preserve filesystem modified time so files that still
-fall back to `FileModifyDate` do not jump to the repair run time.
-Manual date/time edits also write the existing timezone offset fields when an
-offset is known, so the local computer timezone is not introduced during repair.
-When video metadata contains both a local-machine `DateTimeOriginal` offset and
-a timezone-aware `CreationDate`, snapsync uses the `CreationDate` offset.
-Option `2` also includes a manual one-file editor. Enter a filename, then choose
-whether to edit its date, time, offset, or device metadata. The manual editor
-uses step markers (`i.`, `ii.`, `iii.`) and shows the selected file's current
-metadata in a one-row table before asking what to change. Option `2` repair
-subflows use the same step-marker style.
+- `2` Fix audit issues:
+  Repairs selected metadata issues after a preview and confirmation.
+  Available fixes include timezone offset, unknown device, one-file manual
+  edits, bulk repairs, and batch repairs.
 
-Option `3` renames media files in place using snapsync's normalized filename
-rules and the current file metadata. It does not run timezone correction, edit
-metadata, or copy files to `DESTINATION_FOLDER`. It requires typing `yes` before
-scanning files or showing the rename table.
+- `3` Rename files:
+  Renames media in place using the current metadata.
+  It does not copy files or edit metadata.
 
-Option `4` copies files from the current folder into `DESTINATION_FOLDER`,
-preserving their current filenames.
+- `4` Copy files:
+  Copies media into `DESTINATION_FOLDER`, preserving current filenames.
+
+Bulk vs batch repair:
+
+- Bulk repair changes every media file in the folder.
+- Batch repair changes only files that match your filter.
+- Batch date repair: current date, new date, device filter.
+- Batch time repair: current time, new time, device filter.
+- Batch timezone repair: current offset, new offset, device filter.
+- Bulk and batch timezone repair also move the clock time by the offset
+  difference.
+- Example: `+03:00` to `+05:30` with device filter `iPhone` changes
+  `2026-08-26 09:41:37 +03:00` to `2026-08-26 12:11:37 +05:30`.
+- Canon files already at `+05:30` are skipped.
+- iPhone files already at `+05:30` are skipped.
 
 Audit without copying:
 

@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Callable
 
 from config.settings import Settings
 from snapsync.actions.audit_folder import (
     CYAN,
+    RED,
     RESET,
     YELLOW,
     _format_table_row,
@@ -31,6 +32,9 @@ from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.util import logger
 
 
+GREEN = "\033[32m"
+
+
 @dataclass(frozen=True)
 class DeviceChoice:
     name: str
@@ -45,7 +49,8 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count:
             ["1", "Timezone mismatch/missing", str(timezone_count)],
             ["2", "Unknown device", str(unknown_device_count)],
             ["3", "Edit one file manually", "-"],
-            ["4", "Bulk fix date / time / timezone / device", str(bulk_count)],
+            ["4", "Bulk repair date / time / timezone / device", str(bulk_count)],
+            ["5", "Batch repair date / time / timezone / device", str(bulk_count)],
         ],
     )
     print("q. Back")
@@ -75,7 +80,8 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
         ]
         for fix in fixes
     ]
-    _print_table(["Filename", "Date", "Time", "Device", "Current Offset", "New Offset", "Action"], rows)
+    headers = ["Filename", "Date", "Time", "Device", "Current Offset", "New Offset", "Action"]
+    _print_table(headers, _color_preview_rows(headers, rows))
     print()
     if not _confirm_step("ii.", "Type yes to write timezone metadata"):
         logger.warning("Timezone offset fix was not confirmed; no files were changed")
@@ -175,17 +181,17 @@ def run_bulk_metadata_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    _print_section_heading("Bulk Metadata Fix")
+    _print_section_heading("Bulk Metadata Repair")
     _print_dry_run_notice(settings)
     if not candidates:
         print("No files found to fix.")
         return 0
 
     _print_step("i.", "Choose bulk metadata to edit")
-    print("1. Bulk fix date")
-    print("2. Bulk fix time")
-    print("3. Bulk fix timezone")
-    print("4. Bulk fix device")
+    print("1. Bulk repair date")
+    print("2. Bulk repair time")
+    print("3. Bulk repair timezone")
+    print("4. Bulk repair device")
     print()
 
     choice = input("> ").strip().lower()
@@ -204,6 +210,248 @@ def run_bulk_metadata_fix(
 
     logger.info("No bulk metadata field selected")
     return 0
+
+
+def run_batch_metadata_repair(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    _print_section_heading("Batch Repair Date / Time / Timezone / Device")
+    _print_dry_run_notice(settings)
+    if not candidates:
+        print("No files found to fix.")
+        return 0
+
+    print("Use this option when you need to fix metadata for only some files in this folder.")
+    _print_step("i.", "Choose batch metadata to edit")
+    print("1. Batch repair date")
+    print("2. Batch repair time")
+    print("3. Batch repair timezone")
+    print("4. Batch repair device")
+    print()
+
+    choice = input("> ").strip().lower()
+    try:
+        if choice == "1":
+            return _run_batch_date_repair(candidates, metadata_by_path, settings)
+        if choice == "2":
+            return _run_batch_time_repair(candidates, metadata_by_path, settings)
+        if choice == "3":
+            return _run_batch_timezone_repair(candidates, metadata_by_path, settings)
+        if choice == "4":
+            return _run_batch_device_repair(candidates, metadata_by_path, settings)
+    except Exception as exc:
+        logger.error(f"Could not batch update metadata: {exc}")
+        return 1
+
+    logger.info("No batch metadata field selected")
+    return 0
+
+
+def _run_batch_date_repair(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    old_date = _parse_date(_step_input("ii.", "Current date to find (YYYY-MM-DD)"))
+    new_date = _parse_date(_step_input("iii.", "New date (YYYY-MM-DD)"))
+    device_filter = _step_input("iv.", "Device name contains")
+    changes = _sort_candidates(
+        [
+            path
+            for path in candidates
+            if metadata_by_path[path].selected_datetime.date() == old_date
+            and _metadata_matches_device_filter(metadata_by_path[path], device_filter)
+        ],
+        metadata_by_path,
+    )
+    if not changes:
+        print("No files matched that date and device filter.")
+        return 0
+
+    rows = [
+        [
+            path.name,
+            old_date.strftime("%Y-%m-%d"),
+            new_date.strftime("%Y-%m-%d"),
+            metadata_by_path[path].selected_datetime.strftime("%H:%M:%S"),
+            metadata_by_path[path].timezone_offset or "(none)",
+            metadata_by_path[path].device_name,
+        ]
+        for path in changes
+    ]
+    _print_bulk_preview(
+        "Batch Date Repair Preview",
+        ["Filename", "Old Date", "New Date", "Time", "Offset", "Device"],
+        rows,
+    )
+    if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
+        logger.warning("Batch date repair was not confirmed; no files were changed")
+        return 0
+
+    def apply(path: Path, metadata: Metadata) -> Metadata:
+        new_datetime = datetime.combine(new_date, metadata.selected_datetime.time())
+        if not settings.dry_run:
+            write_datetime(path, new_datetime, metadata.timezone_offset, settings)
+        return replace(metadata, selected_datetime=new_datetime)
+
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Date", apply)
+
+
+def _run_batch_time_repair(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    old_time = _parse_time(_step_input("ii.", "Current time to find (HH:MM:SS)"))
+    new_time = _parse_time(_step_input("iii.", "New time (HH:MM:SS)"))
+    device_filter = _step_input("iv.", "Device name contains")
+    changes = _sort_candidates(
+        [
+            path
+            for path in candidates
+            if metadata_by_path[path].selected_datetime.time() == old_time
+            and _metadata_matches_device_filter(metadata_by_path[path], device_filter)
+        ],
+        metadata_by_path,
+    )
+    if not changes:
+        print("No files matched that time and device filter.")
+        return 0
+
+    rows = [
+        [
+            path.name,
+            metadata_by_path[path].selected_datetime.strftime("%Y-%m-%d"),
+            old_time.strftime("%H:%M:%S"),
+            new_time.strftime("%H:%M:%S"),
+            metadata_by_path[path].timezone_offset or "(none)",
+            metadata_by_path[path].device_name,
+        ]
+        for path in changes
+    ]
+    _print_bulk_preview(
+        "Batch Time Repair Preview",
+        ["Filename", "Date", "Old Time", "New Time", "Offset", "Device"],
+        rows,
+    )
+    if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
+        logger.warning("Batch time repair was not confirmed; no files were changed")
+        return 0
+
+    def apply(path: Path, metadata: Metadata) -> Metadata:
+        new_datetime = datetime.combine(metadata.selected_datetime.date(), new_time)
+        if not settings.dry_run:
+            write_datetime(path, new_datetime, metadata.timezone_offset, settings)
+        return replace(metadata, selected_datetime=new_datetime)
+
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Time", apply)
+
+
+def _run_batch_timezone_repair(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    old_offset = _step_input("ii.", "Current offset to find (+HH:MM or -HH:MM)")
+    old_offset_minutes = parse_timezone_offset_minutes(old_offset)
+    if old_offset_minutes is None:
+        raise ValueError("current offset must use +HH:MM or -HH:MM")
+
+    new_offset = _step_input("iii.", "New offset (+HH:MM or -HH:MM)")
+    new_offset_minutes = parse_timezone_offset_minutes(new_offset)
+    if new_offset_minutes is None:
+        raise ValueError("new offset must use +HH:MM or -HH:MM")
+
+    device_filter = _step_input("iv.", "Device name contains")
+    changes = _sort_candidates(
+        [
+            path
+            for path in candidates
+            if metadata_by_path[path].timezone_offset == old_offset
+            and _metadata_matches_device_filter(metadata_by_path[path], device_filter)
+        ],
+        metadata_by_path,
+    )
+    if not changes:
+        print("No files matched that offset and device filter.")
+        return 0
+
+    shift = timedelta(minutes=new_offset_minutes - old_offset_minutes)
+    rows = [
+        [
+            path.name,
+            metadata_by_path[path].selected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+            (metadata_by_path[path].selected_datetime + shift).strftime("%Y-%m-%d %H:%M:%S"),
+            metadata_by_path[path].timezone_offset or "(none)",
+            new_offset,
+            metadata_by_path[path].device_name,
+        ]
+        for path in changes
+    ]
+
+    _print_bulk_preview(
+        "Batch Timezone Repair Preview",
+        ["Filename", "Old Date/Time", "New Date/Time", "Old Offset", "New Offset", "Device"],
+        rows,
+    )
+    if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
+        logger.warning("Batch timezone repair was not confirmed; no files were changed")
+        return 0
+
+    def apply(path: Path, metadata: Metadata) -> Metadata:
+        new_datetime = metadata.selected_datetime + shift
+        if not settings.dry_run:
+            write_datetime(path, new_datetime, new_offset, settings)
+        return replace(metadata, selected_datetime=new_datetime, timezone_offset=new_offset)
+
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Date/Time/Offset", apply)
+
+
+def _run_batch_device_repair(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    settings: Settings,
+) -> int:
+    old_device_filter = _step_input("ii.", "Current device name contains")
+    if not old_device_filter:
+        raise ValueError("current device filter is required")
+    new_device_name = _step_input("iii.", "New device name")
+    if not new_device_name:
+        raise ValueError("new device name is required")
+
+    changes = _sort_candidates(
+        [
+            path
+            for path in candidates
+            if _metadata_matches_device_filter(metadata_by_path[path], old_device_filter)
+        ],
+        metadata_by_path,
+    )
+    if not changes:
+        print("No files matched that device filter.")
+        return 0
+
+    rows = [
+        [path.name, metadata_by_path[path].device_name, new_device_name]
+        for path in changes
+    ]
+    _print_bulk_preview(
+        "Batch Device Repair Preview",
+        ["Filename", "Old Device", "New Device"],
+        rows,
+    )
+    if not _confirm_step("iv.", _metadata_confirmation_prompt(settings)):
+        logger.warning("Batch device repair was not confirmed; no files were changed")
+        return 0
+
+    def apply(path: Path, metadata: Metadata) -> Metadata:
+        if not settings.dry_run:
+            write_device_model(path, new_device_name, settings)
+        return replace(metadata, device_name=new_device_name)
+
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Device", apply)
 
 
 def _run_bulk_date_fix(
@@ -274,26 +522,45 @@ def _run_bulk_timezone_fix(
     settings: Settings,
 ) -> int:
     new_offset = _step_input("ii.", "Enter new offset (+HH:MM or -HH:MM)")
-    if parse_timezone_offset_minutes(new_offset) is None:
+    new_offset_minutes = parse_timezone_offset_minutes(new_offset)
+    if new_offset_minutes is None:
         raise ValueError("offset must use +HH:MM or -HH:MM")
 
-    changes = _sort_candidates(candidates, metadata_by_path)
+    changes = _sort_candidates(
+        [
+            path
+            for path in candidates
+            if parse_timezone_offset_minutes(metadata_by_path[path].timezone_offset) is not None
+        ],
+        metadata_by_path,
+    )
     rows = [
-        [path.name, metadata_by_path[path].timezone_offset or "(none)", new_offset]
+        [
+            path.name,
+            metadata_by_path[path].selected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+            _shift_datetime_to_offset(metadata_by_path[path], new_offset_minutes).strftime("%Y-%m-%d %H:%M:%S"),
+            metadata_by_path[path].timezone_offset or "(none)",
+            new_offset,
+        ]
         for path in changes
     ]
 
-    _print_bulk_preview("Timezone Fix Preview", ["Filename", "Old Offset", "New Offset"], rows)
+    _print_bulk_preview(
+        "Timezone Fix Preview",
+        ["Filename", "Old Date/Time", "New Date/Time", "Old Offset", "New Offset"],
+        rows,
+    )
     if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
         logger.warning("Bulk timezone fix was not confirmed; no files were changed")
         return 0
 
     def apply(path: Path, metadata: Metadata) -> Metadata:
+        new_datetime = _shift_datetime_to_offset(metadata, new_offset_minutes)
         if not settings.dry_run:
-            write_timezone_offset(path, new_offset, settings)
-        return replace(metadata, timezone_offset=new_offset)
+            write_datetime(path, new_datetime, new_offset, settings)
+        return replace(metadata, selected_datetime=new_datetime, timezone_offset=new_offset)
 
-    return _write_bulk_changes(changes, metadata_by_path, settings, "Offset", apply)
+    return _write_bulk_changes(changes, metadata_by_path, settings, "Time/Offset", apply)
 
 
 def _run_bulk_device_fix(
@@ -392,8 +659,9 @@ def _metadata_readback_row(path: Path, metadata: Metadata, changed_field: str) -
         "Offset": metadata.timezone_offset or "(none)",
         "Device": metadata.device_name,
     }
-    if changed_field in values:
-        values[changed_field] = _changed_color(values[changed_field])
+    for field in changed_field.split("/"):
+        if field in values:
+            values[field] = _changed_color(values[field])
 
     return [
         path.name,
@@ -414,16 +682,43 @@ def _bulk_change_was_written(read_metadata: Metadata, planned_metadata: Metadata
         return read_metadata.selected_datetime.time() == planned_metadata.selected_datetime.time()
     if changed_field == "Offset":
         return read_metadata.timezone_offset == planned_metadata.timezone_offset
+    if changed_field == "Time/Offset":
+        return (
+            read_metadata.selected_datetime == planned_metadata.selected_datetime
+            and read_metadata.timezone_offset == planned_metadata.timezone_offset
+        )
+    if changed_field == "Date/Time/Offset":
+        return (
+            read_metadata.selected_datetime == planned_metadata.selected_datetime
+            and read_metadata.timezone_offset == planned_metadata.timezone_offset
+        )
     if changed_field == "Device":
         return read_metadata.device_name == planned_metadata.device_name
     return True
+
+
+def _shift_datetime_to_offset(metadata: Metadata, new_offset_minutes: int) -> datetime:
+    current_offset_minutes = parse_timezone_offset_minutes(metadata.timezone_offset)
+    if current_offset_minutes is None:
+        raise ValueError("current metadata offset must use +HH:MM or -HH:MM")
+    shift = timedelta(minutes=new_offset_minutes - current_offset_minutes)
+    return metadata.selected_datetime + shift
+
+
+def _metadata_matches_device_filter(
+    metadata: Metadata,
+    device_filter: str,
+) -> bool:
+    if not device_filter:
+        return True
+    return device_filter.lower() in metadata.device_name.lower()
 
 
 def _print_bulk_preview(title: str, headers: list[str], rows: list[list[str]]) -> None:
     _print_section_heading(title)
     print("Previewing affected files")
     print()
-    _print_table(headers, rows)
+    _print_table(headers, _color_preview_rows(headers, rows))
 
 
 def _sort_candidates(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[Path]:
@@ -439,6 +734,33 @@ def _sort_candidates(candidates: list[Path], metadata_by_path: dict[Path, Metada
 
 def _changed_color(value: str) -> str:
     return f"{YELLOW}{value}{RESET}"
+
+
+def _old_value_color(value: str) -> str:
+    return f"{RED}{value}{RESET}"
+
+
+def _new_value_color(value: str) -> str:
+    return f"{GREEN}{value}{RESET}"
+
+
+def _color_preview_rows(headers: list[str], rows: list[list[str]]) -> list[list[str]]:
+    return [
+        [
+            _preview_value_color(headers[index], value)
+            for index, value in enumerate(row)
+        ]
+        for row in rows
+    ]
+
+
+def _preview_value_color(header: str, value: str) -> str:
+    normalized_header = header.lower()
+    if normalized_header.startswith(("old ", "current ")):
+        return _old_value_color(value)
+    if normalized_header.startswith("new "):
+        return _new_value_color(value)
+    return value
 
 
 def _print_dry_run_notice(settings: Settings) -> None:

@@ -72,13 +72,13 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("i.\033[0m Review timezone rules and preview:", text)
             self.assertIn("Rules:", text)
             self.assertIn("Timezone baseline: Europe/Helsinki", text)
-            self.assertIn("Helsinki 2026: +03:00 from 2026-03-29, +02:00 from 2026-10-25", text)
+            self.assertIn("Helsinki 2026: +03:00 from 29-03-2026, +02:00 from 25-10-2026", text)
             self.assertIn(
                 "Timestamp priority: DateTimeOriginal > CreateDate > MediaCreateDate > TrackCreateDate > FileModifyDate > FileCreateDate",
                 text,
             )
             self.assertIn(
-                "| IMG_2026.JPG | 2026-04-19 | 10:38:13 | Canon EOS M50 | \033[31m+02:00\033[0m         | \033[32m+03:00\033[0m     | update offset |",
+                "| IMG_2026.JPG | 19-04-2026 | 10:38:13 | Canon EOS M50 | \033[31m+02:00\033[0m         | \033[32m+03:00\033[0m     | update offset |",
                 text,
             )
             self.assertIn("ii.\033[0m Type yes to write timezone metadata:", text)
@@ -298,7 +298,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             self.assertIn("i.\033[0m Review file:", text)
             self.assertIn("| File      | Date       | Time     | Taken From       | Offset | Current Device |", text)
-            self.assertIn("| first.jpg | 2026-01-05 | 12:00:00 | DateTimeOriginal | +02:00 | UnknownDevice  |", text)
+            self.assertIn("| first.jpg | 05-01-2026 | 12:00:00 | DateTimeOriginal | +02:00 | UnknownDevice  |", text)
             self.assertIn("ii.\033[0m Select one of the following:", text)
             self.assertIn("iii.\033[0m Device name:", text)
             self.assertIn("Set Model first.jpg: Canon EOS M50", text)
@@ -432,7 +432,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             self.assertIn("i.\033[0m Enter filename:", text)
             self.assertIn("| File              | Date       | Time     | Taken From       | Offset | Device        |", text)
-            self.assertIn("| Leya-Skiing-2.jpg | 2026-01-05 | 12:00:00 | DateTimeOriginal | +02:00 | UnknownDevice |", text)
+            self.assertIn("| Leya-Skiing-2.jpg | 05-01-2026 | 12:00:00 | DateTimeOriginal | +02:00 | UnknownDevice |", text)
             self.assertIn("ii.\033[0m Choose metadata to edit:", text)
             self.assertIn("iii.\033[0m Select one of the following:", text)
             self.assertIn("iv.\033[0m Device name:", text)
@@ -491,7 +491,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "a", "2026-02-06", "yes"]),
+                patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "a", "06-02-2026", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -524,6 +524,10 @@ class FixAuditIssuesTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertIn(
+                "Will change Leya-Skiing-2.jpg: 05-01-2026 12:00:00 -> 06-02-2026 12:00:00",
+                output.getvalue(),
+            )
             self.assertIn("Updated Leya-Skiing-2.jpg: date/time", output.getvalue())
 
     def test_manual_video_date_fix_preserves_existing_offset(self):
@@ -553,7 +557,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 patch("sys.stdin.isatty", return_value=True),
                 patch(
                     "builtins.input",
-                    side_effect=["3", "0871a475-a7c9-4090-bc6e-68c47ca1ff4f.MP4", "a", "2026-05-02", "yes"],
+                    side_effect=["3", "0871a475-a7c9-4090-bc6e-68c47ca1ff4f.MP4", "a", "02-05-2026", "yes"],
                 ),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
@@ -615,7 +619,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["3", "1911202200134_encoded.mp4", "a", "2022-11-19", "yes"]),
+                patch("builtins.input", side_effect=["3", "1911202200134_encoded.mp4", "a", "19-11-2022", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -736,7 +740,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "a", "02-06-2026"]),
+                patch("builtins.input", side_effect=["3", "Leya-Skiing-2.jpg", "a", "not-a-date"]),
                 patch("snapsync.actions.fix_audit_issues_prompts.logger.error") as error,
                 redirect_stdout(output),
             ):
@@ -761,7 +765,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["4", "1", "2026-08-26", "yes"]),
+                patch("builtins.input", side_effect=["4", "1", "26-08-2026", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_prompts.write_datetime") as write_datetime,
                 redirect_stdout(output),
             ):
@@ -775,8 +779,8 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("DRY RUN: no metadata was written.", text)
             self.assertIn("| 4      | Bulk repair date / time / timezone / device  | 1     |", text)
             self.assertIn("| Filename      | Old Date   | New Date   |", text)
-            self.assertIn("| wrong-day.jpg | \033[31m2026-01-05\033[0m | \033[32m2026-08-26\033[0m |", text)
-            self.assertIn("| wrong-day.jpg | \033[33m2026-08-26\033[0m | 12:00:00 | DateTimeOriginal | +02:00 | UnknownDevice |", text)
+            self.assertIn("| wrong-day.jpg | \033[31m05-01-2026\033[0m | \033[32m26-08-2026\033[0m |", text)
+            self.assertIn("| wrong-day.jpg | \033[33m26-08-2026\033[0m | 12:00:00 | DateTimeOriginal | +02:00 | UnknownDevice |", text)
 
     def test_bulk_time_fix_previews_change_and_highlights_final_time(self):
         with TemporaryDirectory() as temp_dir:
@@ -807,7 +811,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("DRY RUN: no metadata was written.", text)
             self.assertIn("| Filename       | Old Time | New Time |", text)
             self.assertIn("| wrong-time.jpg | \033[31m12:00:00\033[0m | \033[32m08:09:10\033[0m |", text)
-            self.assertIn("| wrong-time.jpg | 2026-01-05 | \033[33m08:09:10\033[0m | DateTimeOriginal | +02:00 | UnknownDevice |", text)
+            self.assertIn("| wrong-time.jpg | 05-01-2026 | \033[33m08:09:10\033[0m | DateTimeOriginal | +02:00 | UnknownDevice |", text)
 
     def test_bulk_timezone_fix_moves_time_and_highlights_time_and_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -838,11 +842,11 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("DRY RUN: no metadata was written.", text)
             self.assertIn("| Filename         | Old Date/Time       | New Date/Time       | Old Offset | New Offset |", text)
             self.assertIn(
-                "| wrong-offset.jpg | \033[31m2026-01-05 12:00:00\033[0m | \033[32m2026-01-05 15:30:00\033[0m | \033[31m+02:00\033[0m     | \033[32m+05:30\033[0m     |",
+                "| wrong-offset.jpg | \033[31m05-01-2026 12:00:00\033[0m | \033[32m05-01-2026 15:30:00\033[0m | \033[31m+02:00\033[0m     | \033[32m+05:30\033[0m     |",
                 text,
             )
             self.assertIn(
-                "| wrong-offset.jpg | 2026-01-05 | \033[33m15:30:00\033[0m | DateTimeOriginal | \033[33m+05:30\033[0m | UnknownDevice |",
+                "| wrong-offset.jpg | 05-01-2026 | \033[33m15:30:00\033[0m | DateTimeOriginal | \033[33m+05:30\033[0m | UnknownDevice |",
                 text,
             )
 
@@ -930,7 +934,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["5", "1", "2026-07-26", "2026-08-26", "iPhone", "yes"]),
+                patch("builtins.input", side_effect=["5", "1", "26-07-2026", "26-08-2026", "iPhone", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_prompts.write_datetime") as write_datetime,
                 redirect_stdout(output),
             ):
@@ -941,7 +945,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             write_datetime.assert_not_called()
             self.assertIn("Batch Date Repair Preview", text)
             self.assertIn(
-                "| IMG_7780.heic | \033[31m2026-07-26\033[0m | \033[32m2026-08-26\033[0m | 09:41:37 | +05:30 | iPhone 16 Pro |",
+                "| IMG_7780.heic | \033[31m26-07-2026\033[0m | \033[32m26-08-2026\033[0m | 09:41:37 | +05:30 | iPhone 16 Pro |",
                 text,
             )
             self.assertNotIn("Canon.jpg |", text)
@@ -993,12 +997,12 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("1. Batch repair date", text)
             self.assertIn("3. Batch repair timezone", text)
             self.assertIn(
-                "| IMG_7780.heic | \033[31m2026-08-26 09:41:37\033[0m | \033[32m2026-08-26 12:11:37\033[0m | \033[31m+03:00\033[0m     | \033[32m+05:30\033[0m     | iPhone 16 Pro |",
+                "| IMG_7780.heic | \033[31m26-08-2026 09:41:37\033[0m | \033[32m26-08-2026 12:11:37\033[0m | \033[31m+03:00\033[0m     | \033[32m+05:30\033[0m     | iPhone 16 Pro |",
                 text,
             )
             self.assertNotIn("CanonEOS700D", text)
             self.assertIn(
-                "| IMG_7780.heic | \033[33m2026-08-26\033[0m | \033[33m12:11:37\033[0m | DateTimeOriginal | \033[33m+05:30\033[0m | iPhone 16 Pro |",
+                "| IMG_7780.heic | \033[33m26-08-2026\033[0m | \033[33m12:11:37\033[0m | DateTimeOriginal | \033[33m+05:30\033[0m | iPhone 16 Pro |",
                 text,
             )
 
@@ -1084,7 +1088,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("DRY RUN: no metadata was written.", text)
             self.assertIn("| Filename         | Old Device    | New Device    |", text)
             self.assertIn("| wrong-device.jpg | \033[31mUnknownDevice\033[0m | \033[32mCanon EOS R50\033[0m |", text)
-            self.assertIn("| wrong-device.jpg | 2026-01-05 | 12:00:00 | DateTimeOriginal | +02:00 | \033[33mCanon EOS R50\033[0m |", text)
+            self.assertIn("| wrong-device.jpg | 05-01-2026 | 12:00:00 | DateTimeOriginal | +02:00 | \033[33mCanon EOS R50\033[0m |", text)
 
 
 def _unknown_device_metadata() -> Metadata:

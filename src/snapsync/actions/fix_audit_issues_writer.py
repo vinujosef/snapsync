@@ -7,6 +7,7 @@ from pathlib import Path
 
 from config.settings import Settings
 from snapsync.metadata import extract_metadata, parse_timezone_offset_minutes
+from snapsync.util.console import format_display_datetime
 
 
 def write_timezone_offset(path: Path, offset: str, settings: Settings) -> None:
@@ -50,7 +51,7 @@ def verify_datetime(
 ) -> None:
     metadata = extract_metadata(path, settings.exiftool_path)
     if metadata.selected_datetime != expected_datetime:
-        raise ValueError(f"metadata still reports {metadata.selected_datetime:%Y-%m-%d %H:%M:%S}")
+        raise ValueError(f"metadata still reports {format_display_datetime(metadata.selected_datetime)}")
     if expected_offset and metadata.timezone_offset != expected_offset:
         raise ValueError(f"metadata offset still reports {metadata.timezone_offset or '(none)'}")
 

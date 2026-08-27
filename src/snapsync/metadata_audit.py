@@ -6,6 +6,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from snapsync.metadata import Metadata
+from snapsync.util.console import format_display_date
 
 
 HELSINKI_TIMEZONE = ZoneInfo("Europe/Helsinki")
@@ -40,8 +41,8 @@ def metadata_years(metadata_by_path: dict[Path, Metadata]) -> list[int]:
 def helsinki_rule_line(year: int) -> str:
     start, end = _dst_transition_dates(year, HELSINKI_TIMEZONE)
     return (
-        f"Helsinki {year}: {offset_at(start, HELSINKI_TIMEZONE)} from {start:%Y-%m-%d}, "
-        f"{offset_at(end, HELSINKI_TIMEZONE)} from {end:%Y-%m-%d}"
+        f"Helsinki {year}: {offset_at(start, HELSINKI_TIMEZONE)} from {format_display_date(start)}, "
+        f"{offset_at(end, HELSINKI_TIMEZONE)} from {format_display_date(end)}"
     )
 
 

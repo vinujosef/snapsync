@@ -14,7 +14,7 @@ from snapsync.renamer import generate_filename
 from snapsync.scanner import scan_source
 from snapsync.summary import RunSummary
 from snapsync.util import logger
-from snapsync.util.console import format_table_row, table_widths
+from snapsync.util.console import format_display_date, format_table_row, table_widths
 
 
 @dataclass(frozen=True)
@@ -86,7 +86,7 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
                     target_path=target_path,
                     old_name=source_path.name,
                     new_name=target_path.name,
-                    taken_date=selected_datetime.strftime("%Y-%m-%d"),
+                    taken_date=format_display_date(selected_datetime),
                     collision=target_path.name != filename,
                 )
             )

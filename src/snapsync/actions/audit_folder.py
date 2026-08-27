@@ -17,6 +17,7 @@ from snapsync.scanner import scan_source
 from snapsync.util import logger
 from snapsync.util.console import (
     cyan,
+    format_display_date,
     format_table_row,
     format_table_separator,
     print_section_heading,
@@ -64,7 +65,7 @@ def _metadata_row(path: Path, metadata: Metadata) -> list[str]:
     taken_at = metadata.selected_datetime
     return [
         _file_cell(path, metadata),
-        taken_at.strftime("%Y-%m-%d"),
+        format_display_date(taken_at),
         taken_at.strftime("%H:%M:%S"),
         _timestamp_field_cell(metadata),
         _timezone_cell(metadata),

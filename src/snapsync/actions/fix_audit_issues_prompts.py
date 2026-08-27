@@ -20,7 +20,16 @@ from snapsync.metadata import Metadata, TIMESTAMP_FIELDS, parse_timezone_offset_
 from snapsync.metadata_audit import helsinki_rule_line
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.util import logger
-from snapsync.util.console import cyan, green, print_section_heading, print_table, red, yellow
+from snapsync.util.console import (
+    cyan,
+    format_display_date,
+    format_display_datetime,
+    green,
+    print_section_heading,
+    print_table,
+    red,
+    yellow,
+)
 
 
 @dataclass(frozen=True)
@@ -59,7 +68,7 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
     rows = [
         [
             fix.path.name,
-            fix.selected_datetime.strftime("%Y-%m-%d"),
+            format_display_date(fix.selected_datetime),
             fix.selected_datetime.strftime("%H:%M:%S"),
             fix.device_name,
             fix.current_offset,
@@ -242,8 +251,8 @@ def _run_batch_date_repair(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    old_date = _parse_date(_step_input("ii.", "Current date to find (YYYY-MM-DD)"))
-    new_date = _parse_date(_step_input("iii.", "New date (YYYY-MM-DD)"))
+    old_date = _parse_date(_step_input("ii.", "Current date to find (DD-MM-YYYY)"))
+    new_date = _parse_date(_step_input("iii.", "New date (DD-MM-YYYY)"))
     device_filter = _step_input("iv.", "Device name contains")
     changes = _sort_candidates(
         [
@@ -261,8 +270,8 @@ def _run_batch_date_repair(
     rows = [
         [
             path.name,
-            old_date.strftime("%Y-%m-%d"),
-            new_date.strftime("%Y-%m-%d"),
+            format_display_date(old_date),
+            format_display_date(new_date),
             metadata_by_path[path].selected_datetime.strftime("%H:%M:%S"),
             metadata_by_path[path].timezone_offset or "(none)",
             metadata_by_path[path].device_name,
@@ -311,7 +320,7 @@ def _run_batch_time_repair(
     rows = [
         [
             path.name,
-            metadata_by_path[path].selected_datetime.strftime("%Y-%m-%d"),
+            format_display_date(metadata_by_path[path].selected_datetime),
             old_time.strftime("%H:%M:%S"),
             new_time.strftime("%H:%M:%S"),
             metadata_by_path[path].timezone_offset or "(none)",
@@ -370,8 +379,8 @@ def _run_batch_timezone_repair(
     rows = [
         [
             path.name,
-            metadata_by_path[path].selected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
-            (metadata_by_path[path].selected_datetime + shift).strftime("%Y-%m-%d %H:%M:%S"),
+            format_display_datetime(metadata_by_path[path].selected_datetime),
+            format_display_datetime(metadata_by_path[path].selected_datetime + shift),
             metadata_by_path[path].timezone_offset or "(none)",
             new_offset,
             metadata_by_path[path].device_name,
@@ -447,14 +456,14 @@ def _run_bulk_date_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    value = _step_input("ii.", "Enter new date (YYYY-MM-DD)")
+    value = _step_input("ii.", "Enter new date (DD-MM-YYYY)")
     new_date = _parse_date(value)
     changes = _sort_candidates(candidates, metadata_by_path)
     rows = [
         [
             path.name,
-            metadata_by_path[path].selected_datetime.strftime("%Y-%m-%d"),
-            new_date.strftime("%Y-%m-%d"),
+            format_display_date(metadata_by_path[path].selected_datetime),
+            format_display_date(new_date),
         ]
         for path in changes
     ]
@@ -525,8 +534,8 @@ def _run_bulk_timezone_fix(
     rows = [
         [
             path.name,
-            metadata_by_path[path].selected_datetime.strftime("%Y-%m-%d %H:%M:%S"),
-            _shift_datetime_to_offset(metadata_by_path[path], new_offset_minutes).strftime("%Y-%m-%d %H:%M:%S"),
+            format_display_datetime(metadata_by_path[path].selected_datetime),
+            format_display_datetime(_shift_datetime_to_offset(metadata_by_path[path], new_offset_minutes)),
             metadata_by_path[path].timezone_offset or "(none)",
             new_offset,
         ]
@@ -641,7 +650,7 @@ def _write_bulk_changes(
 def _metadata_readback_row(path: Path, metadata: Metadata, changed_field: str) -> list[str]:
     taken_at = metadata.selected_datetime
     values = {
-        "Date": taken_at.strftime("%Y-%m-%d"),
+        "Date": format_display_date(taken_at),
         "Time": taken_at.strftime("%H:%M:%S"),
         "Taken From": metadata.timestamp_field,
         "Offset": metadata.timezone_offset or "(none)",
@@ -777,7 +786,7 @@ def _print_device_fix_metadata(fix: DeviceFix) -> None:
         [
             [
                 fix.path.name,
-                fix.selected_datetime.strftime("%Y-%m-%d"),
+                format_display_date(fix.selected_datetime),
                 fix.selected_datetime.strftime("%H:%M:%S"),
                 fix.timestamp_field,
                 fix.timezone_offset or "(none)",
@@ -821,7 +830,7 @@ def _print_current_metadata(path: Path, metadata: Metadata) -> None:
         [
             [
                 path.name,
-                taken_at.strftime("%Y-%m-%d"),
+                format_display_date(taken_at),
                 taken_at.strftime("%H:%M:%S"),
                 metadata.timestamp_field,
                 metadata.timezone_offset or "(none)",
@@ -832,7 +841,7 @@ def _print_current_metadata(path: Path, metadata: Metadata) -> None:
 
 
 def _run_manual_date_fix(path: Path, metadata: Metadata, settings: Settings) -> int:
-    value = _step_input("iii.", "New date (YYYY-MM-DD)")
+    value = _step_input("iii.", "New date (DD-MM-YYYY)")
     new_date = _parse_date(value)
     new_datetime = datetime.combine(new_date, metadata.selected_datetime.time())
     return _write_manual_datetime_change(path, metadata, new_datetime, settings, "iv.")
@@ -890,7 +899,7 @@ def _write_manual_datetime_change(
 ) -> int:
     print(
         f"Will change {path.name}: "
-        f"{metadata.selected_datetime:%Y-%m-%d %H:%M:%S} -> {new_datetime:%Y-%m-%d %H:%M:%S}"
+        f"{format_display_datetime(metadata.selected_datetime)} -> {format_display_datetime(new_datetime)}"
     )
     if not _confirm_step(confirmation_step, "Type yes to write metadata"):
         logger.warning("Manual date/time fix was not confirmed; no files were changed")
@@ -904,10 +913,12 @@ def _write_manual_datetime_change(
 
 
 def _parse_date(value: str) -> date:
-    try:
-        return datetime.strptime(value, "%Y-%m-%d").date()
-    except ValueError as exc:
-        raise ValueError("date must use YYYY-MM-DD") from exc
+    for date_format in ("%d-%m-%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, date_format).date()
+        except ValueError:
+            pass
+    raise ValueError("date must use DD-MM-YYYY")
 
 
 def _parse_time(value: str) -> time:

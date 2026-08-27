@@ -1,9 +1,12 @@
 # Shared helpers for terminal colors and simple text tables.
 from __future__ import annotations
 
+from datetime import date, datetime
 import re
 
 
+DISPLAY_DATE_FORMAT = "%d-%m-%Y"
+DISPLAY_DATETIME_FORMAT = "%d-%m-%Y %H:%M:%S"
 RESET = "\033[0m"
 BOLD = "\033[1m"
 BLUE = "\033[34m"
@@ -76,3 +79,11 @@ def pad_cell(value: str, width: int) -> str:
 
 def visible_len(value: str) -> int:
     return len(ANSI_PATTERN.sub("", value))
+
+
+def format_display_date(value: date | datetime) -> str:
+    return value.strftime(DISPLAY_DATE_FORMAT)
+
+
+def format_display_datetime(value: datetime) -> str:
+    return value.strftime(DISPLAY_DATETIME_FORMAT)

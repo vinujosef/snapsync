@@ -56,7 +56,7 @@ class AuditFolderTests(unittest.TestCase):
             self.assertIn("\033[36m- red = needs review\033[0m", text)
             self.assertIn("\033[36mRules:\033[0m", text)
             self.assertIn("\033[36mTimezone baseline: Europe/Helsinki\033[0m", text)
-            self.assertIn("\033[36mHelsinki 2026: +03:00 from 2026-03-29, +02:00 from 2026-10-25\033[0m", text)
+            self.assertIn("\033[36mHelsinki 2026: +03:00 from 29-03-2026, +02:00 from 25-10-2026\033[0m", text)
             self.assertIn(
                 "\033[36mTimestamp priority: DateTimeOriginal > CreateDate > MediaCreateDate > "
                 "TrackCreateDate > FileModifyDate > FileCreateDate\033[0m",
@@ -68,11 +68,11 @@ class AuditFolderTests(unittest.TestCase):
                 text,
             )
             self.assertIn(
-                "| IMG_0001.JPG | 2026-05-18 | 14:22:11 | DateTimeOriginal | +03:00 | iPhone 16 Pro |",
+                "| IMG_0001.JPG | 18-05-2026 | 14:22:11 | DateTimeOriginal | +03:00 | iPhone 16 Pro |",
                 text,
             )
             self.assertIn(
-                "| \033[31mclip.mov\033[0m     | 2026-05-19 | 09:01:02 | \033[33mMediaCreateDate\033[0m  | \033[31m(none)\033[0m | Canon EOS M50 |",
+                "| \033[31mclip.mov\033[0m     | 19-05-2026 | 09:01:02 | \033[33mMediaCreateDate\033[0m  | \033[31m(none)\033[0m | Canon EOS M50 |",
                 text,
             )
             self.assertIn("\033[36mIssue(s):\033[0m", text)
@@ -189,8 +189,8 @@ class AuditFolderTests(unittest.TestCase):
             plain_text = _strip_colors(text)
             self.assertIn("Rules:", plain_text)
             self.assertIn("Timezone baseline: Europe/Helsinki", plain_text)
-            self.assertIn("Helsinki 2025: +03:00 from 2025-03-30, +02:00 from 2025-10-26", plain_text)
-            self.assertIn("Helsinki 2026: +03:00 from 2026-03-29, +02:00 from 2026-10-25", plain_text)
+            self.assertIn("Helsinki 2025: +03:00 from 30-03-2025, +02:00 from 26-10-2025", plain_text)
+            self.assertIn("Helsinki 2026: +03:00 from 29-03-2026, +02:00 from 25-10-2026", plain_text)
             self.assertIn("\033[36mRules:\033[0m", text)
 
     def test_marks_timezone_red_when_it_does_not_match_helsinki_offset(self):
@@ -252,10 +252,7 @@ class AuditFolderTests(unittest.TestCase):
                 exit_code = run_folder_audit(root, settings)
 
             self.assertEqual(exit_code, 0)
-            self.assertIn(
-                "| IMG_5537.JPG | 2025-12-20 | 16:48:24 | DateTimeOriginal | +02:00 | Canon EOS M50 |",
-                output.getvalue(),
-            )
+            self.assertIn("| IMG_5537.JPG | 20-12-2025 | 16:48:24 | DateTimeOriginal | +02:00 | Canon EOS M50 |", output.getvalue())
             self.assertNotIn("\033[31m+02:00\033[0m", output.getvalue())
             self.assertNotIn("\033[31mIMG_5537.JPG\033[0m", output.getvalue())
 
@@ -456,8 +453,14 @@ class AuditFolderTests(unittest.TestCase):
                 if set(line) == {"-"} and len(line) == len(header)
             ]
             self.assertEqual(len(divider_indexes), 1)
-            second_index = lines.index("| second.jpg | 2026-01-05 | 13:00:00 | DateTimeOriginal | +02:00 | iPhone 16 Pro |")
-            third_index = lines.index("| third.jpg  | 2026-01-06 | 12:00:00 | DateTimeOriginal | +02:00 | iPhone 16 Pro |")
+            second_index = next(
+                index for index, line in enumerate(lines)
+                if line.startswith("| second.jpg | 05-01-2026 | 13:00:00 | DateTimeOriginal | +02:00 | iPhone 16 Pro |")
+            )
+            third_index = next(
+                index for index, line in enumerate(lines)
+                if line.startswith("| third.jpg  | 06-01-2026 | 12:00:00 | DateTimeOriginal | +02:00 | iPhone 16 Pro |")
+            )
             self.assertLess(second_index, divider_indexes[0])
             self.assertLess(divider_indexes[0], third_index)
 

@@ -64,15 +64,15 @@ class AuditFolderTests(unittest.TestCase):
             )
             self.assertIn("\033[36mDetails:\033[0m", text)
             self.assertIn(
-                "| Filename     | Date       | Time     | Taken From       | Offset | Device        |",
+                "| Filename     | Date       | Time     | Taken From       | Offset | Device        | Fingerprint       |",
                 text,
             )
             self.assertIn(
-                "| IMG_0001.JPG | 18-05-2026 | 14:22:11 | DateTimeOriginal | +03:00 | iPhone 16 Pro |",
+                "| IMG_0001.JPG | 18-05-2026 | 14:22:11 | DateTimeOriginal | +03:00 | iPhone 16 Pro | 5 B res? 14:22:11 |",
                 text,
             )
             self.assertIn(
-                "| \033[31mclip.mov\033[0m     | 19-05-2026 | 09:01:02 | \033[33mMediaCreateDate\033[0m  | \033[31m(none)\033[0m | Canon EOS M50 |",
+                "| \033[31mclip.mov\033[0m     | 19-05-2026 | 09:01:02 | \033[33mMediaCreateDate\033[0m  | \033[31m(none)\033[0m | Canon EOS M50 | 5 B res? 09:01:02 |",
                 text,
             )
             self.assertIn("\033[36mIssue(s):\033[0m", text)

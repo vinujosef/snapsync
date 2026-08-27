@@ -11,6 +11,8 @@ class MetadataTests(unittest.TestCase):
                 "DateTimeOriginal": "2026:05:18 14:22:11",
                 "OffsetTimeOriginal": "+03:00",
                 "Model": "iPhone 16 Pro",
+                "ImageWidth": 4032,
+                "ImageHeight": "3024",
             }
         )
 
@@ -21,6 +23,8 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(metadata.timezone_field, "OffsetTimeOriginal")
         self.assertEqual(metadata.device_name, "iPhone 16 Pro")
         self.assertEqual(metadata.device_field, "Model")
+        self.assertEqual(metadata.image_width, 4032)
+        self.assertEqual(metadata.image_height, 3024)
 
     def test_tracks_fallback_timezone_and_device_source_fields(self):
         metadata = _metadata_from_exiftool(

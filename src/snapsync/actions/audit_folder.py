@@ -5,6 +5,7 @@ from collections import Counter
 from pathlib import Path
 
 from config.settings import Settings
+from snapsync.file_fingerprint import file_fingerprint
 from snapsync.metadata import Metadata, TIMESTAMP_FIELDS
 from snapsync.metadata_audit import (
     helsinki_rule_line,
@@ -18,12 +19,9 @@ from snapsync.util import logger
 from snapsync.util.console import (
     cyan,
     format_display_date,
-    format_table_row,
-    format_table_separator,
+    print_grouped_table,
     print_section_heading,
     red,
-    table_widths,
-    visible_len,
     yellow,
 )
 
@@ -70,6 +68,7 @@ def _metadata_row(path: Path, metadata: Metadata) -> list[str]:
         _timestamp_field_cell(metadata),
         _timezone_cell(metadata),
         _device_cell(metadata),
+        file_fingerprint(path, metadata),
     ]
 
 
@@ -136,16 +135,6 @@ def _print_table(rows: list[list[str]]) -> None:
         "Taken From",
         "Offset",
         "Device",
+        "Fingerprint",
     ]
-    widths = table_widths(headers, rows)
-
-    print(format_table_row(headers, widths))
-    print(format_table_separator(widths))
-    row_width = visible_len(format_table_row(headers, widths))
-    previous_date: str | None = None
-    for row in rows:
-        current_date = row[1]
-        if previous_date is not None and current_date != previous_date:
-            print("-" * row_width)
-        print(format_table_row(row, widths))
-        previous_date = current_date
+    print_grouped_table(headers, rows, [row[1] for row in rows])

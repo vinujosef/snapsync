@@ -16,6 +16,7 @@ from snapsync.actions.fix_audit_issues_writer import (
     write_device_model,
     write_timezone_offset,
 )
+from snapsync.file_fingerprint import file_fingerprint
 from snapsync.metadata import Metadata, TIMESTAMP_FIELDS, parse_timezone_offset_minutes
 from snapsync.metadata_audit import helsinki_rule_line
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
@@ -25,6 +26,7 @@ from snapsync.util.console import (
     format_display_date,
     format_display_datetime,
     green,
+    print_grouped_table,
     print_section_heading,
     print_table,
     red,
@@ -74,11 +76,16 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
             fix.current_offset,
             fix.expected_offset,
             _action_label("update offset", settings),
+            file_fingerprint(fix.path, _metadata_from_timezone_fix(fix)),
         ]
         for fix in fixes
     ]
-    headers = ["Filename", "Date", "Time", "Device", "Current Offset", "New Offset", "Action"]
-    _print_table(headers, _color_preview_rows(headers, rows))
+    headers = ["Filename", "Date", "Time", "Device", "Current Offset", "New Offset", "Action", "Fingerprint"]
+    _print_file_table(
+        headers,
+        _color_preview_rows(headers, rows),
+        [format_display_date(fix.selected_datetime) for fix in fixes],
+    )
     print()
     if not _confirm_step("ii.", "Type yes to write timezone metadata"):
         logger.warning("Timezone offset fix was not confirmed; no files were changed")
@@ -275,13 +282,15 @@ def _run_batch_date_repair(
             metadata_by_path[path].selected_datetime.strftime("%H:%M:%S"),
             metadata_by_path[path].timezone_offset or "(none)",
             metadata_by_path[path].device_name,
+            file_fingerprint(path, metadata_by_path[path]),
         ]
         for path in changes
     ]
     _print_bulk_preview(
         "Batch Date Repair Preview",
-        ["Filename", "Old Date", "New Date", "Time", "Offset", "Device"],
+        ["Filename", "Old Date", "New Date", "Time", "Offset", "Device", "Fingerprint"],
         rows,
+        _group_values(changes, metadata_by_path),
     )
     if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
         logger.warning("Batch date repair was not confirmed; no files were changed")
@@ -325,13 +334,15 @@ def _run_batch_time_repair(
             new_time.strftime("%H:%M:%S"),
             metadata_by_path[path].timezone_offset or "(none)",
             metadata_by_path[path].device_name,
+            file_fingerprint(path, metadata_by_path[path]),
         ]
         for path in changes
     ]
     _print_bulk_preview(
         "Batch Time Repair Preview",
-        ["Filename", "Date", "Old Time", "New Time", "Offset", "Device"],
+        ["Filename", "Date", "Old Time", "New Time", "Offset", "Device", "Fingerprint"],
         rows,
+        _group_values(changes, metadata_by_path),
     )
     if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
         logger.warning("Batch time repair was not confirmed; no files were changed")
@@ -384,14 +395,16 @@ def _run_batch_timezone_repair(
             metadata_by_path[path].timezone_offset or "(none)",
             new_offset,
             metadata_by_path[path].device_name,
+            file_fingerprint(path, metadata_by_path[path]),
         ]
         for path in changes
     ]
 
     _print_bulk_preview(
         "Batch Timezone Repair Preview",
-        ["Filename", "Old Date/Time", "New Date/Time", "Old Offset", "New Offset", "Device"],
+        ["Filename", "Old Date/Time", "New Date/Time", "Old Offset", "New Offset", "Device", "Fingerprint"],
         rows,
+        _group_values(changes, metadata_by_path),
     )
     if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
         logger.warning("Batch timezone repair was not confirmed; no files were changed")
@@ -431,13 +444,19 @@ def _run_batch_device_repair(
         return 0
 
     rows = [
-        [path.name, metadata_by_path[path].device_name, new_device_name]
+        [
+            path.name,
+            metadata_by_path[path].device_name,
+            new_device_name,
+            file_fingerprint(path, metadata_by_path[path]),
+        ]
         for path in changes
     ]
     _print_bulk_preview(
         "Batch Device Repair Preview",
-        ["Filename", "Old Device", "New Device"],
+        ["Filename", "Old Device", "New Device", "Fingerprint"],
         rows,
+        _group_values(changes, metadata_by_path),
     )
     if not _confirm_step("iv.", _metadata_confirmation_prompt(settings)):
         logger.warning("Batch device repair was not confirmed; no files were changed")
@@ -464,11 +483,17 @@ def _run_bulk_date_fix(
             path.name,
             format_display_date(metadata_by_path[path].selected_datetime),
             format_display_date(new_date),
+            file_fingerprint(path, metadata_by_path[path]),
         ]
         for path in changes
     ]
 
-    _print_bulk_preview("Date Fix Preview", ["Filename", "Old Date", "New Date"], rows)
+    _print_bulk_preview(
+        "Date Fix Preview",
+        ["Filename", "Old Date", "New Date", "Fingerprint"],
+        rows,
+        _group_values(changes, metadata_by_path),
+    )
     if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
         logger.warning("Bulk date fix was not confirmed; no files were changed")
         return 0
@@ -495,11 +520,17 @@ def _run_bulk_time_fix(
             path.name,
             metadata_by_path[path].selected_datetime.strftime("%H:%M:%S"),
             new_time.strftime("%H:%M:%S"),
+            file_fingerprint(path, metadata_by_path[path]),
         ]
         for path in changes
     ]
 
-    _print_bulk_preview("Time Fix Preview", ["Filename", "Old Time", "New Time"], rows)
+    _print_bulk_preview(
+        "Time Fix Preview",
+        ["Filename", "Old Time", "New Time", "Fingerprint"],
+        rows,
+        _group_values(changes, metadata_by_path),
+    )
     if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
         logger.warning("Bulk time fix was not confirmed; no files were changed")
         return 0
@@ -538,14 +569,16 @@ def _run_bulk_timezone_fix(
             format_display_datetime(_shift_datetime_to_offset(metadata_by_path[path], new_offset_minutes)),
             metadata_by_path[path].timezone_offset or "(none)",
             new_offset,
+            file_fingerprint(path, metadata_by_path[path]),
         ]
         for path in changes
     ]
 
     _print_bulk_preview(
         "Timezone Fix Preview",
-        ["Filename", "Old Date/Time", "New Date/Time", "Old Offset", "New Offset"],
+        ["Filename", "Old Date/Time", "New Date/Time", "Old Offset", "New Offset", "Fingerprint"],
         rows,
+        _group_values(changes, metadata_by_path),
     )
     if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
         logger.warning("Bulk timezone fix was not confirmed; no files were changed")
@@ -572,11 +605,21 @@ def _run_bulk_device_fix(
 
     changes = _sort_candidates(candidates, metadata_by_path)
     rows = [
-        [path.name, metadata_by_path[path].device_name, device_choice.name]
+        [
+            path.name,
+            metadata_by_path[path].device_name,
+            device_choice.name,
+            file_fingerprint(path, metadata_by_path[path]),
+        ]
         for path in changes
     ]
 
-    _print_bulk_preview("Device Fix Preview", ["Filename", "Old Device", "New Device"], rows)
+    _print_bulk_preview(
+        "Device Fix Preview",
+        ["Filename", "Old Device", "New Device", "Fingerprint"],
+        rows,
+        _group_values(changes, metadata_by_path),
+    )
     confirmation_step = "iv." if device_choice.used_custom_name else "iii."
     if not _confirm_step(confirmation_step, _metadata_confirmation_prompt(settings)):
         logger.warning("Bulk device fix was not confirmed; no files were changed")
@@ -641,7 +684,11 @@ def _write_bulk_changes(
         final_rows.append(_metadata_readback_row(path, planned_metadata_by_path[path], changed_field))
 
     if final_rows:
-        _print_table(["Filename", "Date", "Time", "Taken From", "Offset", "Device"], final_rows)
+        _print_file_table(
+            ["Filename", "Date", "Time", "Taken From", "Offset", "Device", "Fingerprint"],
+            final_rows,
+            [format_display_date(planned_metadata_by_path[path].selected_datetime) for path in changed_paths],
+        )
     else:
         print("No metadata was updated.")
     return 0 if errors == 0 else 1
@@ -667,6 +714,7 @@ def _metadata_readback_row(path: Path, metadata: Metadata, changed_field: str) -
         values["Taken From"],
         values["Offset"],
         values["Device"],
+        file_fingerprint(path, metadata),
     ]
 
 
@@ -711,11 +759,11 @@ def _metadata_matches_device_filter(
     return device_filter.lower() in metadata.device_name.lower()
 
 
-def _print_bulk_preview(title: str, headers: list[str], rows: list[list[str]]) -> None:
+def _print_bulk_preview(title: str, headers: list[str], rows: list[list[str]], group_values: list[str]) -> None:
     print_section_heading(title)
     print("Previewing affected files")
     print()
-    _print_table(headers, _color_preview_rows(headers, rows))
+    _print_file_table(headers, _color_preview_rows(headers, rows), group_values)
 
 
 def _sort_candidates(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[Path]:
@@ -782,7 +830,7 @@ def _print_timezone_rules(fixes: list[TimezoneFix]) -> None:
 
 def _print_device_fix_metadata(fix: DeviceFix) -> None:
     _print_table(
-        ["File", "Date", "Time", "Taken From", "Offset", "Current Device"],
+        ["File", "Date", "Time", "Taken From", "Offset", "Current Device", "Fingerprint"],
         [
             [
                 fix.path.name,
@@ -791,6 +839,7 @@ def _print_device_fix_metadata(fix: DeviceFix) -> None:
                 fix.timestamp_field,
                 fix.timezone_offset or "(none)",
                 fix.device_name,
+                file_fingerprint(fix.path, _metadata_from_device_fix(fix)),
             ],
         ],
     )
@@ -826,7 +875,7 @@ def _print_current_metadata(path: Path, metadata: Metadata) -> None:
     taken_at = metadata.selected_datetime
     print()
     _print_table(
-        ["File", "Date", "Time", "Taken From", "Offset", "Device"],
+        ["File", "Date", "Time", "Taken From", "Offset", "Device", "Fingerprint"],
         [
             [
                 path.name,
@@ -835,6 +884,7 @@ def _print_current_metadata(path: Path, metadata: Metadata) -> None:
                 metadata.timestamp_field,
                 metadata.timezone_offset or "(none)",
                 metadata.device_name,
+                file_fingerprint(path, metadata),
             ],
         ],
     )
@@ -1007,3 +1057,35 @@ def _completion_label(label: str, settings: Settings) -> str:
 
 def _print_table(headers: list[str], rows: list[list[str]]) -> None:
     print_table(headers, rows)
+
+
+def _print_file_table(headers: list[str], rows: list[list[str]], group_values: list[str]) -> None:
+    print_grouped_table(headers, rows, group_values)
+
+
+def _group_values(paths: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[str]:
+    return [format_display_date(metadata_by_path[path].selected_datetime) for path in paths]
+
+
+def _metadata_from_timezone_fix(fix: TimezoneFix) -> Metadata:
+    return Metadata(
+        selected_datetime=fix.selected_datetime,
+        timestamp_field="DateTimeOriginal",
+        device_name=fix.device_name,
+        quality="metadata",
+        timezone_offset=fix.current_offset if fix.current_offset != "(none)" else None,
+        image_width=fix.image_width,
+        image_height=fix.image_height,
+    )
+
+
+def _metadata_from_device_fix(fix: DeviceFix) -> Metadata:
+    return Metadata(
+        selected_datetime=fix.selected_datetime,
+        timestamp_field=fix.timestamp_field,
+        device_name=fix.device_name,
+        quality="metadata",
+        timezone_offset=fix.timezone_offset,
+        image_width=fix.image_width,
+        image_height=fix.image_height,
+    )

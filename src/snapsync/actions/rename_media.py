@@ -2,19 +2,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 import sys
 
 from config.settings import Settings
 from snapsync.classifier import UNKNOWN, classify
 from snapsync.duplicate import calculate_hash, collision_path
+from snapsync.file_fingerprint import file_fingerprint
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.renamer import generate_filename
 from snapsync.scanner import scan_source
 from snapsync.summary import RunSummary
 from snapsync.util import logger
-from snapsync.util.console import format_display_date, format_table_row, table_widths
+from snapsync.util.console import format_display_date, print_grouped_table
 
 
 @dataclass(frozen=True)
@@ -24,6 +24,7 @@ class RenameChange:
     old_name: str
     new_name: str
     taken_date: str
+    fingerprint: str
     collision: bool
 
 
@@ -87,6 +88,7 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
                     old_name=source_path.name,
                     new_name=target_path.name,
                     taken_date=format_display_date(selected_datetime),
+                    fingerprint=file_fingerprint(source_path, metadata),
                     collision=target_path.name != filename,
                 )
             )
@@ -127,22 +129,12 @@ def _rename_target(source_path: Path, filename: str) -> Path:
 
 
 def _print_rename_table(changes: list[RenameChange]) -> None:
-    headers = ["#", "Old name", "New name"]
+    headers = ["#", "Old name", "New name", "Date", "Fingerprint"]
     rows = [
-        [str(index), change.old_name, change.new_name]
+        [str(index), change.old_name, change.new_name, change.taken_date, change.fingerprint]
         for index, change in enumerate(changes, start=1)
     ]
-    widths = table_widths(headers, rows)
-    print(format_table_row(headers, widths))
-    print(format_table_row(["-" * width for width in widths], widths))
-    row_width = len(format_table_row(headers, widths))
-    previous_date: str | None = None
-    for row in rows:
-        change_date = changes[int(row[0]) - 1].taken_date
-        if previous_date is not None and change_date != previous_date:
-            print("-" * row_width)
-        print(format_table_row(row, widths))
-        previous_date = change_date
+    print_grouped_table(headers, rows, [change.taken_date for change in changes])
 
 
 def _confirm_rename(settings: Settings) -> bool:

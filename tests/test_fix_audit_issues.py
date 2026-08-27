@@ -254,6 +254,51 @@ class FixAuditIssuesTests(unittest.TestCase):
             run.assert_not_called()
             self.assertLess(text.index("A_same_time.jpg"), text.index("B_same_time.jpg"))
             self.assertLess(text.index("B_same_time.jpg"), text.index("A_later.jpg"))
+            self.assertIn("Fingerprint", text)
+
+    def test_timezone_fix_preview_groups_files_by_date(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            first = root / "first.jpg"
+            second = root / "second.jpg"
+            third = root / "third.jpg"
+            for path in (first, second, third):
+                path.write_bytes(b"photo")
+            settings = _settings(root, dry_run=True)
+            output = StringIO()
+
+            metadata_by_path = {
+                first: _metadata_with_timezone_issue(datetime(2026, 5, 5, 12, 0, 0)),
+                second: _metadata_with_timezone_issue(datetime(2026, 5, 5, 13, 0, 0)),
+                third: _metadata_with_timezone_issue(datetime(2026, 5, 6, 12, 0, 0)),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["1", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run"),
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            lines = output.getvalue().splitlines()
+            header_index = next(index for index, line in enumerate(lines) if line.startswith("| Filename"))
+            first_index = next(index for index, line in enumerate(lines) if line.startswith("| first.jpg"))
+            second_index = next(index for index, line in enumerate(lines) if line.startswith("| second.jpg"))
+            third_index = next(index for index, line in enumerate(lines) if line.startswith("| third.jpg"))
+            divider_indexes = [
+                index
+                for index, line in enumerate(lines)
+                if set(line) == {"-"} and len(line) == len(lines[header_index])
+            ]
+            preview_dividers = [index for index in divider_indexes if second_index < index < third_index]
+            self.assertEqual(len(preview_dividers), 1)
+            self.assertLess(first_index, second_index)
 
     def test_fixes_unknown_devices_per_file_and_exits(self):
         with TemporaryDirectory() as temp_dir:

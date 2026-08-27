@@ -39,6 +39,10 @@ EXIFTOOL_FIELDS = (
     "-CameraModelName",
     "-Make",
     "-DeviceManufacturer",
+    "-ImageWidth",
+    "-ImageHeight",
+    "-ExifImageWidth",
+    "-ExifImageHeight",
 )
 
 
@@ -51,6 +55,8 @@ class Metadata:
     timezone_offset: str | None = None
     timezone_field: str | None = None
     device_field: str | None = None
+    image_width: int | None = None
+    image_height: int | None = None
 
 
 def extract_metadata(path: Path, exiftool_path: str = "exiftool") -> Metadata:
@@ -94,6 +100,7 @@ def _metadata_from_exiftool(metadata: dict[str, object]) -> Metadata | None:
         if parsed:
             device_name, device_field = _extract_device_name(metadata)
             timezone_offset, timezone_field = _extract_timezone_offset(metadata)
+            image_width, image_height = _extract_image_dimensions(metadata)
             return Metadata(
                 selected_datetime=parsed,
                 timestamp_field=field,
@@ -102,6 +109,8 @@ def _metadata_from_exiftool(metadata: dict[str, object]) -> Metadata | None:
                 timezone_offset=timezone_offset,
                 timezone_field=timezone_field,
                 device_field=device_field,
+                image_width=image_width,
+                image_height=image_height,
             )
     return None
 
@@ -203,6 +212,23 @@ def _extract_timezone_offset(metadata: dict[str, object]) -> tuple[str | None, s
         if offset:
             return offset, field
     return None, None
+
+
+def _extract_image_dimensions(metadata: dict[str, object]) -> tuple[int | None, int | None]:
+    width = _parse_int(metadata.get("ImageWidth")) or _parse_int(metadata.get("ExifImageWidth"))
+    height = _parse_int(metadata.get("ImageHeight")) or _parse_int(metadata.get("ExifImageHeight"))
+    return width, height
+
+
+def _parse_int(value: object) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
 
 
 def _extract_datetime_timezone_offset(value: object) -> str | None:

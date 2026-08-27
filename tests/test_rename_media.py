@@ -48,6 +48,8 @@ class RenameMediaTests(unittest.TestCase):
             self.assertFalse(photo.exists())
             self.assertTrue(expected.exists())
             self.assertIn("| # | Old name     | New name", output.getvalue())
+            self.assertIn("Date", output.getvalue())
+            self.assertIn("Fingerprint", output.getvalue())
             self.assertIn(f"| 1 | IMG_0001.JPG | {expected.name}", output.getvalue())
 
     def test_rename_respects_dry_run(self):
@@ -83,6 +85,7 @@ class RenameMediaTests(unittest.TestCase):
             expected_hash = hashlib.sha256(b"photo").hexdigest()[:12]
             expected_name = f"2026-05-18_142211_iPhone16Pro_{expected_hash}.jpg"
             self.assertIn("| # | Old name     | New name", output.getvalue())
+            self.assertIn("Fingerprint", output.getvalue())
             self.assertIn(f"| 1 | IMG_0001.JPG | {expected_name}", output.getvalue())
 
     def test_rename_does_not_run_timezone_correction_prompt(self):

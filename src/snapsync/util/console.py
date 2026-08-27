@@ -56,6 +56,20 @@ def print_table(headers: list[str], rows: list[list[str]]) -> None:
         print(format_table_row(row, widths))
 
 
+def print_grouped_table(headers: list[str], rows: list[list[str]], group_values: list[str]) -> None:
+    widths = table_widths(headers, rows)
+    print(format_table_row(headers, widths))
+    print(format_table_separator(widths))
+    row_width = visible_len(format_table_row(headers, widths))
+    previous_group: str | None = None
+    for index, row in enumerate(rows):
+        current_group = group_values[index]
+        if previous_group is not None and current_group != previous_group:
+            print("-" * row_width)
+        print(format_table_row(row, widths))
+        previous_group = current_group
+
+
 def table_widths(headers: list[str], rows: list[list[str]]) -> list[int]:
     return [
         max(visible_len(row[index]) for row in [headers, *rows])

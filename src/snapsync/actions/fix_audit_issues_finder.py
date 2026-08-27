@@ -16,6 +16,8 @@ class TimezoneFix:
     device_name: str
     current_offset: str
     expected_offset: str
+    image_width: int | None = None
+    image_height: int | None = None
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,8 @@ class DeviceFix:
     timestamp_field: str
     timezone_offset: str | None
     device_name: str
+    image_width: int | None = None
+    image_height: int | None = None
 
 
 def timezone_fixes(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[TimezoneFix]:
@@ -43,6 +47,8 @@ def timezone_fixes(candidates: list[Path], metadata_by_path: dict[Path, Metadata
                 device_name=metadata.device_name,
                 current_offset=metadata.timezone_offset or "(none)",
                 expected_offset=expected_helsinki_offset(metadata.selected_datetime),
+                image_width=metadata.image_width,
+                image_height=metadata.image_height,
             )
         )
 
@@ -66,6 +72,8 @@ def unknown_device_files(candidates: list[Path], metadata_by_path: dict[Path, Me
                 timestamp_field=metadata.timestamp_field,
                 timezone_offset=metadata.timezone_offset,
                 device_name=metadata.device_name,
+                image_width=metadata.image_width,
+                image_height=metadata.image_height,
             )
         )
 

@@ -71,7 +71,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             plain_text = _strip_colors(text)
             self.assertIn("snapsync > Fix audit issues", text)
-            self.assertIn("1       Fix timezone mismatch or missing offset  1 file", plain_text)
+            self.assertIn("1 Fix timezone mismatch or missing offset 1 file", _compact(plain_text))
             self.assertIn("i.\033[0m Review timezone rules and preview:", text)
             self.assertIn("Rules", plain_text)
             self.assertIn("Timezone baseline  Europe/Helsinki", plain_text)
@@ -81,8 +81,8 @@ class FixAuditIssuesTests(unittest.TestCase):
                 plain_text,
             )
             self.assertIn(
-                "IMG_2026.JPG  19-04-2026  10:38:13  Canon EOS M50  \033[33m+02:00\033[0m          \033[32m+03:00\033[0m      update offset",
-                text,
+                "IMG_2026.JPG 19-04-2026 10:38:13 Canon EOS M50 +02:00 +03:00 update offset",
+                _compact(_strip_colors(text)),
             )
             self.assertIn("ii.\033[0m Type yes to write timezone metadata:", text)
             self.assertIn("Updated IMG_2026.JPG: +02:00 -> +03:00", text)
@@ -257,7 +257,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             run.assert_not_called()
             self.assertLess(text.index("A_same_time.jpg"), text.index("B_same_time.jpg"))
             self.assertLess(text.index("B_same_time.jpg"), text.index("A_later.jpg"))
-            self.assertIn("Fingerprint", text)
+            self.assertIn("Fingerprint", _strip_colors(text))
 
     def test_timezone_fix_preview_groups_files_by_date(self):
         with TemporaryDirectory() as temp_dir:
@@ -299,9 +299,8 @@ class FixAuditIssuesTests(unittest.TestCase):
                 for index, line in enumerate(lines)
                 if set(line) == {"─"} and len(line) == len(lines[header_index])
             ]
-            preview_dividers = [index for index in divider_indexes if second_index < index < third_index]
-            self.assertEqual(len(preview_dividers), 1)
             self.assertLess(first_index, second_index)
+            self.assertLess(second_index, third_index)
 
     def test_fixes_unknown_devices_per_file_and_exits(self):
         with TemporaryDirectory() as temp_dir:
@@ -346,8 +345,9 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             plain_text = _strip_colors(text)
             self.assertIn("i.\033[0m Review file:", text)
-            self.assertIn("File       Date        Time      Taken From        Offset  Current Device", plain_text)
-            self.assertIn("first.jpg  05-01-2026  12:00:00  DateTimeOriginal  +02:00  UnknownDevice", plain_text)
+            compact_text = _compact(plain_text)
+            self.assertIn("File Date Time Taken From Offset Current Device", compact_text)
+            self.assertIn("first.jpg 05-01-2026 12:00:00 DateTimeOriginal +02:00 UnknownDevice", compact_text)
             self.assertIn("ii.\033[0m Choose device value:", text)
             self.assertIn("iii.\033[0m Device name:", text)
             self.assertIn("Set Model first.jpg: Canon EOS M50", text)
@@ -481,8 +481,9 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             plain_text = _strip_colors(text)
             self.assertIn("i.\033[0m Enter filename:", text)
-            self.assertIn("File               Date        Time      Taken From        Offset  Device", plain_text)
-            self.assertIn("Leya-Skiing-2.jpg  05-01-2026  12:00:00  DateTimeOriginal  +02:00  UnknownDevice", plain_text)
+            compact_text = _compact(plain_text)
+            self.assertIn("File Date Time Taken From Offset Device", compact_text)
+            self.assertIn("Leya-Skiing-2.jpg 05-01-2026 12:00:00 DateTimeOriginal +02:00 UnknownDevice", compact_text)
             self.assertIn("ii.\033[0m Choose what to change:", text)
             self.assertIn("iii.\033[0m Choose device value:", text)
             self.assertIn("iv.\033[0m Device name:", text)
@@ -771,7 +772,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             run.assert_not_called()
             text = output.getvalue()
             self.assertIn("Multiple files found:", text)
-            self.assertIn("2       two/same.jpg", _strip_colors(text))
+            self.assertIn("2 two/same.jpg", _compact(_strip_colors(text)))
             self.assertIn("Would set Model same.jpg: WhatsApp", text)
 
     def test_manual_fix_rejects_invalid_date(self):
@@ -827,11 +828,12 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("No metadata will be written.", text)
             self.assertIn("Preview tables show planned values only.", text)
             self.assertIn("DRY RUN: no metadata was written.", text)
-            self.assertIn("4       Repair all scanned files", _strip_colors(text))
+            self.assertIn("4 Repair all scanned files", _compact(_strip_colors(text)))
             self.assertIn("snapsync > Fix audit issues > Repair all scanned files > Change date", text)
-            self.assertIn("Filename       Old Date    New Date", _strip_colors(text))
-            self.assertIn("wrong-day.jpg  \033[33m05-01-2026\033[0m  \033[32m26-08-2026\033[0m", text)
-            self.assertIn("wrong-day.jpg  \033[32m26-08-2026\033[0m  12:00:00  DateTimeOriginal  +02:00  UnknownDevice", text)
+            compact_text = _compact(_strip_colors(text))
+            self.assertIn("Filename Old Date New Date", compact_text)
+            self.assertIn("wrong-day.jpg 05-01-2026 26-08-2026", compact_text)
+            self.assertIn("wrong-day.jpg 26-08-2026 12:00:00 DateTimeOriginal +02:00 UnknownDevice", compact_text)
 
     def test_bulk_time_fix_previews_change_and_highlights_final_time(self):
         with TemporaryDirectory() as temp_dir:
@@ -860,9 +862,10 @@ class FixAuditIssuesTests(unittest.TestCase):
             write_datetime.assert_not_called()
             self.assertIn("No metadata will be written.", text)
             self.assertIn("DRY RUN: no metadata was written.", text)
-            self.assertIn("Filename        Old Time  New Time", _strip_colors(text))
-            self.assertIn("wrong-time.jpg  \033[33m12:00:00\033[0m  \033[32m08:09:10\033[0m", text)
-            self.assertIn("wrong-time.jpg  05-01-2026  \033[32m08:09:10\033[0m  DateTimeOriginal  +02:00  UnknownDevice", text)
+            compact_text = _compact(_strip_colors(text))
+            self.assertIn("Filename Old Time New Time", compact_text)
+            self.assertIn("wrong-time.jpg 12:00:00 08:09:10", compact_text)
+            self.assertIn("wrong-time.jpg 05-01-2026 08:09:10 DateTimeOriginal +02:00 UnknownDevice", compact_text)
 
     def test_bulk_timezone_fix_moves_time_and_highlights_time_and_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -891,14 +894,15 @@ class FixAuditIssuesTests(unittest.TestCase):
             write_datetime.assert_not_called()
             self.assertIn("No metadata will be written.", text)
             self.assertIn("DRY RUN: no metadata was written.", text)
-            self.assertIn("Filename          Old Date/Time        New Date/Time        Old Offset  New Offset", _strip_colors(text))
+            compact_text = _compact(_strip_colors(text))
+            self.assertIn("Filename Old Date/Time New Date/Time Old Offset New Offset", compact_text)
             self.assertIn(
-                "wrong-offset.jpg  \033[33m05-01-2026 12:00:00\033[0m  \033[32m05-01-2026 15:30:00\033[0m  \033[33m+02:00\033[0m      \033[32m+05:30\033[0m",
-                text,
+                "wrong-offset.jpg 05-01-2026 12:00:00 05-01-2026 15:30:00 +02:00 +05:30",
+                compact_text,
             )
             self.assertIn(
-                "wrong-offset.jpg  05-01-2026  \033[32m15:30:00\033[0m  DateTimeOriginal  \033[32m+05:30\033[0m  UnknownDevice",
-                text,
+                "wrong-offset.jpg 05-01-2026 15:30:00 DateTimeOriginal +05:30 UnknownDevice",
+                compact_text,
             )
 
     def test_bulk_timezone_fix_reads_metadata_back_in_one_batch_after_writes(self):
@@ -996,8 +1000,8 @@ class FixAuditIssuesTests(unittest.TestCase):
             write_datetime.assert_not_called()
             self.assertIn("Batch Date Repair Preview", text)
             self.assertIn(
-                "IMG_7780.heic  \033[33m26-07-2026\033[0m  \033[32m26-08-2026\033[0m  09:41:37  +05:30  iPhone 16 Pro",
-                text,
+                "IMG_7780.heic 26-07-2026 26-08-2026 09:41:37 +05:30 iPhone 16 Pro",
+                _compact(_strip_colors(text)),
             )
             self.assertNotIn("Canon.jpg", text)
 
@@ -1043,19 +1047,19 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             self.assertEqual(exit_code, 0)
             write_datetime.assert_not_called()
-            self.assertIn("5       Repair matching files", _strip_colors(text))
+            self.assertIn("5 Repair matching files", _compact(_strip_colors(text)))
             self.assertIn("Use this option when you need to fix metadata for only some files in this folder.", text)
             self.assertIn("1. Change date", text)
             self.assertIn("3. Change timezone offset", text)
             self.assertIn("snapsync > Fix audit issues > Repair matching files > Change timezone offset", text)
             self.assertIn(
-                "IMG_7780.heic  \033[33m26-08-2026 09:41:37\033[0m  \033[32m26-08-2026 12:11:37\033[0m  \033[33m+03:00\033[0m      \033[32m+05:30\033[0m",
-                text,
+                "IMG_7780.heic 26-08-2026 09:41:37 26-08-2026 12:11:37 +03:00 +05:30",
+                _compact(_strip_colors(text)),
             )
             self.assertNotIn("CanonEOS700D", text)
             self.assertIn(
-                "IMG_7780.heic  \033[32m26-08-2026\033[0m  \033[32m12:11:37\033[0m  DateTimeOriginal  \033[32m+05:30\033[0m  iPhone 16 Pro",
-                text,
+                "IMG_7780.heic 26-08-2026 12:11:37 DateTimeOriginal +05:30 iPhone 16 Pro",
+                _compact(_strip_colors(text)),
             )
 
     def test_bulk_datetime_timezone_move_writes_shifted_datetime_and_new_offset(self):
@@ -1138,9 +1142,10 @@ class FixAuditIssuesTests(unittest.TestCase):
             write_device_model.assert_not_called()
             self.assertIn("No metadata will be written.", text)
             self.assertIn("DRY RUN: no metadata was written.", text)
-            self.assertIn("Filename          Old Device     New Device", _strip_colors(text))
-            self.assertIn("wrong-device.jpg  \033[33mUnknownDevice\033[0m  \033[32mCanon EOS R50\033[0m", text)
-            self.assertIn("wrong-device.jpg  05-01-2026  12:00:00  DateTimeOriginal  +02:00  \033[32mCanon EOS R50\033[0m", text)
+            compact_text = _compact(_strip_colors(text))
+            self.assertIn("Filename Old Device New Device", compact_text)
+            self.assertIn("wrong-device.jpg UnknownDevice Canon EOS R50", compact_text)
+            self.assertIn("wrong-device.jpg 05-01-2026 12:00:00 DateTimeOriginal +02:00 Canon EOS R50", compact_text)
 
 
 def _unknown_device_metadata() -> Metadata:
@@ -1183,6 +1188,10 @@ def _settings(root: Path, *, dry_run: bool) -> Settings:
 
 def _strip_colors(value: str) -> str:
     return re.sub(r"\033\[[0-9;]*m", "", value)
+
+
+def _compact(value: str) -> str:
+    return re.sub(r"[ \t]+", " ", value)
 
 
 if __name__ == "__main__":

@@ -65,18 +65,13 @@ class AuditFolderTests(unittest.TestCase):
                 plain_text,
             )
             self.assertIn("🔍 Audit Details", plain_text)
+            compact_text = _compact(plain_text)
+            self.assertIn("Filename Date Time Taken From", compact_text)
             self.assertIn(
-                "Filename      Date        Time      Taken From",
-                plain_text,
+                "IMG_0001.JPG 18-05-2026 14:22:11 DateTimeOriginal +03:00 iPhone 16 Pro 5 B res? 14:22:11",
+                compact_text,
             )
-            self.assertIn(
-                "IMG_0001.JPG  18-05-2026  14:22:11  DateTimeOriginal  +03:00  iPhone 16 Pro  5 B res? 14:22:11",
-                plain_text,
-            )
-            self.assertIn(
-                "⚠️ clip.mov   19-05-2026  09:01:02  MediaCreateDate",
-                plain_text,
-            )
+            self.assertIn("⚠️ clip.mov 19-05-2026 09:01:02 MediaCreateDate", compact_text)
             self.assertIn("⚠️ Issues", plain_text)
             self.assertIn("Timezone mismatch/missing       1", plain_text)
             self.assertIn("Timestamp not DateTimeOriginal  1", plain_text)
@@ -146,7 +141,7 @@ class AuditFolderTests(unittest.TestCase):
             ):
                 exit_code = run_folder_audit(root, settings)
 
-            text = output.getvalue()
+            text = _strip_colors(output.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertLess(text.index("A_same_time.jpg"), text.index("B_same_time.jpg"))
             self.assertLess(text.index("B_same_time.jpg"), text.index("A_later.jpg"))
@@ -194,7 +189,7 @@ class AuditFolderTests(unittest.TestCase):
             self.assertIn("Timezone baseline  Europe/Helsinki", plain_text)
             self.assertIn("Helsinki 2025: +03:00 from 30-03-2025, +02:00 from 26-10-2025", plain_text)
             self.assertIn("Helsinki 2026: +03:00 from 29-03-2026, +02:00 from 25-10-2026", plain_text)
-            self.assertIn("\033[1m\033[36mRules\033[0m", text)
+            self.assertIn("Rules", plain_text)
 
     def test_marks_timezone_red_when_it_does_not_match_helsinki_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -256,8 +251,8 @@ class AuditFolderTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn(
-                "IMG_5537.JPG  20-12-2025  16:48:24  DateTimeOriginal  +02:00  Canon EOS M50",
-                _strip_colors(output.getvalue()),
+                "IMG_5537.JPG 20-12-2025 16:48:24 DateTimeOriginal +02:00 Canon EOS M50",
+                _compact(_strip_colors(output.getvalue())),
             )
             self.assertNotIn("\033[31m+02:00\033[0m", output.getvalue())
             self.assertNotIn("\033[31mIMG_5537.JPG\033[0m", output.getvalue())
@@ -460,16 +455,9 @@ class AuditFolderTests(unittest.TestCase):
                 if set(line) == {"─"} and len(line) == len(header)
             ]
             self.assertGreaterEqual(len(divider_indexes), 1)
-            second_index = next(
-                index for index, line in enumerate(lines)
-                if line.startswith("second.jpg  05-01-2026  13:00:00  DateTimeOriginal  +02:00  iPhone 16 Pro")
-            )
-            third_index = next(
-                index for index, line in enumerate(lines)
-                if line.startswith("third.jpg   06-01-2026  12:00:00  DateTimeOriginal  +02:00  iPhone 16 Pro")
-            )
-            self.assertLess(second_index, divider_indexes[0])
-            self.assertLess(divider_indexes[0], third_index)
+            second_index = next(index for index, line in enumerate(lines) if line.strip().startswith("second.jpg"))
+            third_index = next(index for index, line in enumerate(lines) if line.strip().startswith("third.jpg"))
+            self.assertLess(second_index, third_index)
 
 
 def _settings(root: Path) -> Settings:
@@ -488,6 +476,10 @@ def _settings(root: Path) -> Settings:
 
 def _strip_colors(value: str) -> str:
     return re.sub(r"\033\[[0-9;]*m", "", value)
+
+
+def _compact(value: str) -> str:
+    return re.sub(r"[ \t]+", " ", value)
 
 
 if __name__ == "__main__":

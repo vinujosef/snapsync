@@ -4,7 +4,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
+import builtins
 import re
+import shutil
+import sys
+
+try:
+    from rich import box
+    from rich.console import Console
+    from rich.table import Table
+    from rich.text import Text
+except ImportError:  # pragma: no cover - exercised when dependencies are absent.
+    box = None
+    Console = None
+    Table = None
+    Text = None
 
 
 DISPLAY_DATE_FORMAT = "%d-%m-%Y"
@@ -21,6 +35,14 @@ MUTED = "\033[90m"
 ANSI_PATTERN = re.compile(r"\033\[[0-9;]*m")
 DEFAULT_TRAILING_PATH_PARTS = 9
 TABLE_SEPARATOR = "─"
+RICH_STYLES = {
+    BLUE: "blue",
+    CYAN: "cyan",
+    GREEN: "green",
+    YELLOW: "yellow",
+    RED: "red",
+    MUTED: "bright_black",
+}
 
 
 @dataclass(frozen=True)
@@ -111,23 +133,47 @@ def color(text: str, color_code: str, *, bold: bool = False, dim: bool = False) 
     return f"{prefix}{text}{RESET}"
 
 
+def _rich_enabled() -> bool:
+    return Console is not None and Text is not None and Table is not None and box is not None
+
+
+def _console() -> Console:
+    terminal_width = shutil.get_terminal_size(fallback=(160, 24)).columns
+    return Console(
+        file=sys.stdout,
+        force_terminal=True,
+        color_system="standard",
+        highlight=False,
+        soft_wrap=True,
+        width=max(terminal_width, 160),
+        _environ={"COLUMNS": str(max(terminal_width, 160)), "LINES": "24"},
+    )
+
+
+def _emit(value: str = "") -> None:
+    if _rich_enabled():
+        _console().print(Text.from_ansi(value))
+        return
+    builtins.print(value)
+
+
 def print_title(title: str, *, icon: str | None = None) -> None:
-    print()
+    _emit()
     label = f"{icon} {title}" if icon else title
-    print(heading(label, bold=True))
+    _emit(heading(label, bold=True))
 
 
 def print_section_heading(title: str, *, icon: str | None = None) -> None:
-    print()
+    _emit()
     label = f"{icon} {title}" if icon else title
-    print(heading(label, bold=True))
+    _emit(heading(label, bold=True))
 
 
 def print_notice(title: str, detail: str | None = None, *, icon: str = ICONS["info"]) -> None:
-    print()
-    print(warning(f"{icon} {title}", bold=True))
+    _emit()
+    _emit(warning(f"{icon} {title}", bold=True))
     if detail:
-        print(muted(detail))
+        _emit(muted(detail))
 
 
 def print_key_values(rows: list[tuple[str, object]], *, value_color: str | None = None) -> None:
@@ -136,29 +182,63 @@ def print_key_values(rows: list[tuple[str, object]], *, value_color: str | None 
         formatted_value = str(value)
         if value_color is not None:
             formatted_value = color(formatted_value, value_color)
-        print(f"{muted(label.ljust(label_width))}  {formatted_value}")
+        _emit(f"{muted(label.ljust(label_width))}  {formatted_value}")
 
 
 def print_table(headers: list[str], rows: list[list[str]]) -> None:
+    if _rich_enabled():
+        _print_rich_table(headers, rows)
+        return
     widths = table_widths(headers, rows)
-    print(format_table_row(headers, widths, header=True))
-    print(format_table_separator(widths))
+    _emit(format_table_row(headers, widths, header=True))
+    _emit(format_table_separator(widths))
     for row in rows:
-        print(format_table_row(row, widths))
+        _emit(format_table_row(row, widths))
 
 
 def print_grouped_table(headers: list[str], rows: list[list[str]], group_values: list[str]) -> None:
+    if _rich_enabled():
+        _print_rich_table(headers, rows, group_values=group_values)
+        return
     widths = table_widths(headers, rows)
-    print(format_table_row(headers, widths, header=True))
-    print(format_table_separator(widths))
+    _emit(format_table_row(headers, widths, header=True))
+    _emit(format_table_separator(widths))
     row_width = visible_len(format_table_row(headers, widths))
     previous_group: str | None = None
     for index, row in enumerate(rows):
         current_group = group_values[index]
         if previous_group is not None and current_group != previous_group:
-            print(muted(TABLE_SEPARATOR * row_width))
-        print(format_table_row(row, widths))
+            _emit(muted(TABLE_SEPARATOR * row_width))
+        _emit(format_table_row(row, widths))
         previous_group = current_group
+
+
+def _print_rich_table(
+    headers: list[str],
+    rows: list[list[str]],
+    *,
+    group_values: list[str] | None = None,
+) -> None:
+    table = Table(
+        box=box.SIMPLE_HEAD,
+        header_style="bold cyan",
+        show_edge=False,
+        show_lines=False,
+        pad_edge=False,
+    )
+    for header in headers:
+        table.add_column(header, overflow="fold")
+
+    previous_group: str | None = None
+    for index, row in enumerate(rows):
+        if group_values is not None:
+            current_group = group_values[index]
+            if previous_group is not None and current_group != previous_group:
+                table.add_section()
+            previous_group = current_group
+        table.add_row(*[Text.from_ansi(value) for value in row])
+
+    _console().print(table)
 
 
 def table_widths(headers: list[str], rows: list[list[str]]) -> list[int]:

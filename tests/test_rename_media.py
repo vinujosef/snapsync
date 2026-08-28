@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import hashlib
+import re
 import unittest
 
 from config.settings import Settings
@@ -47,10 +48,11 @@ class RenameMediaTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertFalse(photo.exists())
             self.assertTrue(expected.exists())
-            self.assertIn("| # | Old name     | New name", output.getvalue())
+            text = _strip_colors(output.getvalue())
+            self.assertIn("#  Old name", text)
             self.assertIn("Date", output.getvalue())
             self.assertIn("Fingerprint", output.getvalue())
-            self.assertIn(f"| 1 | IMG_0001.JPG | {expected.name}", output.getvalue())
+            self.assertIn(f"1  IMG_0001.JPG  {expected.name}", text)
 
     def test_rename_respects_dry_run(self):
         with TemporaryDirectory() as temp_dir:
@@ -84,9 +86,10 @@ class RenameMediaTests(unittest.TestCase):
             self.assertTrue(photo.exists())
             expected_hash = hashlib.sha256(b"photo").hexdigest()[:12]
             expected_name = f"2026-05-18_142211_iPhone16Pro_{expected_hash}.jpg"
-            self.assertIn("| # | Old name     | New name", output.getvalue())
+            text = _strip_colors(output.getvalue())
+            self.assertIn("#  Old name", text)
             self.assertIn("Fingerprint", output.getvalue())
-            self.assertIn(f"| 1 | IMG_0001.JPG | {expected_name}", output.getvalue())
+            self.assertIn(f"1  IMG_0001.JPG  {expected_name}", text)
 
     def test_rename_does_not_run_timezone_correction_prompt(self):
         with TemporaryDirectory() as temp_dir:
@@ -160,11 +163,11 @@ class RenameMediaTests(unittest.TestCase):
                 exit_code = run_media_rename(root, settings)
 
             self.assertEqual(exit_code, 0)
-            text = output.getvalue()
-            self.assertLess(text.index("| 1 | Z_EARLIER.JPG"), text.index("| 2 | A_LATER.JPG"))
-            first_row = next(line for line in text.splitlines() if line.startswith("| 1 | Z_EARLIER.JPG"))
-            second_row = next(line for line in text.splitlines() if line.startswith("| 2 | A_LATER.JPG"))
-            separator = "-" * len(first_row)
+            text = _strip_colors(output.getvalue())
+            self.assertLess(text.index("1  Z_EARLIER.JPG"), text.index("2  A_LATER.JPG"))
+            first_row = next(line for line in text.splitlines() if line.startswith("1  Z_EARLIER.JPG"))
+            second_row = next(line for line in text.splitlines() if line.startswith("2  A_LATER.JPG"))
+            separator = "─" * len(first_row)
             self.assertLess(text.index(first_row), text.index(separator))
             self.assertLess(text.index(separator), text.index(second_row))
 
@@ -206,6 +209,10 @@ def _settings(root: Path, *, dry_run: bool) -> Settings:
         allowed_video_extensions=frozenset({"mov", "mp4"}),
         ignored_folders=frozenset(),
     )
+
+
+def _strip_colors(value: str) -> str:
+    return re.sub(r"\033\[[0-9;]*m", "", value)
 
 
 if __name__ == "__main__":

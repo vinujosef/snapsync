@@ -1,6 +1,7 @@
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+import re
 import unittest
 
 from snapsync.summary import RunSummary
@@ -31,7 +32,7 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("(📸 photo)", text)
         self.assertIn("/vault/2026/01 - January/photo/", text)
         self.assertIn("/vault/2026/12 - December/photo/", text)
-        self.assertIn("(📹 video)", text)
+        self.assertIn("(🎞️ video)", text)
         self.assertIn("/vault/2026/12 - December/video/", text)
 
     def test_dry_run_summary_lists_folders_as_would_be_written(self):
@@ -52,17 +53,7 @@ class SummaryTests(unittest.TestCase):
 
 
 def _strip_colors(value: str) -> str:
-    for color in (
-        "\033[0m",
-        "\033[1m",
-        "\033[34m",
-        "\033[36m",
-        "\033[32m",
-        "\033[33m",
-        "\033[31m",
-    ):
-        value = value.replace(color, "")
-    return value
+    return re.sub(r"\033\[[0-9;]*m", "", value)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 
-from snapsync.util.console import BLUE, CYAN, GREEN, RED, RESET, YELLOW
+from snapsync.util.console import BLUE, CYAN, GREEN, ICONS, RED, RESET, YELLOW
 
 
 LEVELS = {
@@ -22,11 +22,11 @@ COLORS = {
 }
 
 SYMBOLS = {
-    "DEBUG": "🔎 ",
-    "INFO": "ℹ️ ",
-    "SUCCESS": "✅ ",
-    "WARNING": "⚠️ ",
-    "ERROR": "❌ ",
+    "DEBUG": ICONS["audit"],
+    "INFO": ICONS["info"],
+    "SUCCESS": ICONS["success"],
+    "WARNING": ICONS["warning"],
+    "ERROR": ICONS["error"],
 }
 
 _level = LEVELS["INFO"]

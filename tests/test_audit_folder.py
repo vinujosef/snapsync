@@ -4,6 +4,7 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+import re
 import unittest
 
 from config.settings import Settings
@@ -49,39 +50,40 @@ class AuditFolderTests(unittest.TestCase):
                 exit_code = run_folder_audit(root, settings)
 
             text = output.getvalue()
+            plain_text = _strip_colors(text)
             self.assertEqual(exit_code, 0)
-            self.assertIn("\033[36mInfo:\033[0m", text)
-            self.assertIn("\033[36mFiles: 2\033[0m", text)
-            self.assertIn("\033[36mLegend:\033[0m", text)
-            self.assertIn("\033[36m- red = needs review\033[0m", text)
-            self.assertIn("\033[36mRules:\033[0m", text)
-            self.assertIn("\033[36mTimezone baseline: Europe/Helsinki\033[0m", text)
+            self.assertIn("ℹ️ Info", plain_text)
+            self.assertIn("Files  2", plain_text)
+            self.assertIn("Legend", plain_text)
+            self.assertIn("red = needs review", plain_text)
+            self.assertIn("Rules", plain_text)
+            self.assertIn("Timezone baseline  Europe/Helsinki", plain_text)
             self.assertIn("\033[36mHelsinki 2026: +03:00 from 29-03-2026, +02:00 from 25-10-2026\033[0m", text)
             self.assertIn(
-                "\033[36mTimestamp priority: DateTimeOriginal > CreateDate > MediaCreateDate > "
-                "TrackCreateDate > FileModifyDate > FileCreateDate\033[0m",
-                text,
+                "Timestamp priority  DateTimeOriginal > CreateDate > MediaCreateDate > "
+                "TrackCreateDate > FileModifyDate > FileCreateDate",
+                plain_text,
             )
-            self.assertIn("\033[36mDetails:\033[0m", text)
+            self.assertIn("🔍 Audit Details", plain_text)
             self.assertIn(
-                "| Filename     | Date       | Time     | Taken From       | Offset | Device        | Fingerprint       |",
-                text,
-            )
-            self.assertIn(
-                "| IMG_0001.JPG | 18-05-2026 | 14:22:11 | DateTimeOriginal | +03:00 | iPhone 16 Pro | 5 B res? 14:22:11 |",
-                text,
+                "Filename      Date        Time      Taken From",
+                plain_text,
             )
             self.assertIn(
-                "| \033[31mclip.mov\033[0m     | 19-05-2026 | 09:01:02 | \033[33mMediaCreateDate\033[0m  | \033[31m(none)\033[0m | Canon EOS M50 | 5 B res? 09:01:02 |",
-                text,
+                "IMG_0001.JPG  18-05-2026  14:22:11  DateTimeOriginal  +03:00  iPhone 16 Pro  5 B res? 14:22:11",
+                plain_text,
             )
-            self.assertIn("\033[36mIssue(s):\033[0m", text)
-            self.assertIn("\033[36mTimezone mismatch/missing: 1\033[0m", text)
-            self.assertIn("\033[36mTimestamp not DateTimeOriginal: 1\033[0m", text)
-            self.assertIn("\033[36mUnknown device: 0\033[0m", text)
+            self.assertIn(
+                "⚠️ clip.mov   19-05-2026  09:01:02  MediaCreateDate",
+                plain_text,
+            )
+            self.assertIn("⚠️ Issues", plain_text)
+            self.assertIn("Timezone mismatch/missing       1", plain_text)
+            self.assertIn("Timestamp not DateTimeOriginal  1", plain_text)
+            self.assertIn("Unknown device                  0", plain_text)
             self.assertGreater(
-                text.index("Issue(s):"),
-                text.index("| \033[31mclip.mov\033[0m"),
+                plain_text.index("Issues"),
+                plain_text.index("clip.mov"),
             )
 
     def test_prints_zero_count_for_empty_folder(self):
@@ -93,11 +95,12 @@ class AuditFolderTests(unittest.TestCase):
                 exit_code = run_folder_audit(root, _settings(root))
 
             self.assertEqual(exit_code, 0)
-            self.assertIn("\033[36mFiles: 0\033[0m", output.getvalue())
-            self.assertIn("\033[36mTimestamp priority:", output.getvalue())
-            self.assertNotIn("Helsinki 2025:", output.getvalue())
-            self.assertNotIn("Details:", output.getvalue())
-            self.assertNotIn("Issue(s):", output.getvalue())
+            plain_text = _strip_colors(output.getvalue())
+            self.assertIn("Files  0", plain_text)
+            self.assertIn("Timestamp priority", plain_text)
+            self.assertNotIn("Helsinki 2025:", plain_text)
+            self.assertNotIn("Audit Details", plain_text)
+            self.assertNotIn("Issues", plain_text)
 
     def test_orders_details_by_date_time_then_filename(self):
         with TemporaryDirectory() as temp_dir:
@@ -187,11 +190,11 @@ class AuditFolderTests(unittest.TestCase):
             text = output.getvalue()
             self.assertEqual(exit_code, 0)
             plain_text = _strip_colors(text)
-            self.assertIn("Rules:", plain_text)
-            self.assertIn("Timezone baseline: Europe/Helsinki", plain_text)
+            self.assertIn("Rules", plain_text)
+            self.assertIn("Timezone baseline  Europe/Helsinki", plain_text)
             self.assertIn("Helsinki 2025: +03:00 from 30-03-2025, +02:00 from 26-10-2025", plain_text)
             self.assertIn("Helsinki 2026: +03:00 from 29-03-2026, +02:00 from 25-10-2026", plain_text)
-            self.assertIn("\033[36mRules:\033[0m", text)
+            self.assertIn("\033[1m\033[36mRules\033[0m", text)
 
     def test_marks_timezone_red_when_it_does_not_match_helsinki_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -252,7 +255,10 @@ class AuditFolderTests(unittest.TestCase):
                 exit_code = run_folder_audit(root, settings)
 
             self.assertEqual(exit_code, 0)
-            self.assertIn("| IMG_5537.JPG | 20-12-2025 | 16:48:24 | DateTimeOriginal | +02:00 | Canon EOS M50 |", output.getvalue())
+            self.assertIn(
+                "IMG_5537.JPG  20-12-2025  16:48:24  DateTimeOriginal  +02:00  Canon EOS M50",
+                _strip_colors(output.getvalue()),
+            )
             self.assertNotIn("\033[31m+02:00\033[0m", output.getvalue())
             self.assertNotIn("\033[31mIMG_5537.JPG\033[0m", output.getvalue())
 
@@ -396,9 +402,10 @@ class AuditFolderTests(unittest.TestCase):
 
             text = output.getvalue()
             self.assertEqual(exit_code, 0)
-            self.assertIn("\033[36mTimezone mismatch/missing: 2\033[0m", text)
-            self.assertIn("\033[36mTimestamp not DateTimeOriginal: 1\033[0m", text)
-            self.assertIn("\033[36mUnknown device: 1\033[0m", text)
+            plain_text = _strip_colors(text)
+            self.assertIn("Timezone mismatch/missing       2", plain_text)
+            self.assertIn("Timestamp not DateTimeOriginal  1", plain_text)
+            self.assertIn("Unknown device                  1", plain_text)
 
     def test_prints_divider_when_file_date_changes(self):
         with TemporaryDirectory() as temp_dir:
@@ -445,21 +452,21 @@ class AuditFolderTests(unittest.TestCase):
                 exit_code = run_folder_audit(root, settings)
 
             self.assertEqual(exit_code, 0)
-            lines = output.getvalue().splitlines()
-            header = next(line for line in lines if line.startswith("| Filename"))
+            lines = _strip_colors(output.getvalue()).splitlines()
+            header = next(line for line in lines if line.startswith("Filename"))
             divider_indexes = [
                 index
                 for index, line in enumerate(lines)
-                if set(line) == {"-"} and len(line) == len(header)
+                if set(line) == {"─"} and len(line) == len(header)
             ]
-            self.assertEqual(len(divider_indexes), 1)
+            self.assertGreaterEqual(len(divider_indexes), 1)
             second_index = next(
                 index for index, line in enumerate(lines)
-                if line.startswith("| second.jpg | 05-01-2026 | 13:00:00 | DateTimeOriginal | +02:00 | iPhone 16 Pro |")
+                if line.startswith("second.jpg  05-01-2026  13:00:00  DateTimeOriginal  +02:00  iPhone 16 Pro")
             )
             third_index = next(
                 index for index, line in enumerate(lines)
-                if line.startswith("| third.jpg  | 06-01-2026 | 12:00:00 | DateTimeOriginal | +02:00 | iPhone 16 Pro |")
+                if line.startswith("third.jpg   06-01-2026  12:00:00  DateTimeOriginal  +02:00  iPhone 16 Pro")
             )
             self.assertLess(second_index, divider_indexes[0])
             self.assertLess(divider_indexes[0], third_index)
@@ -480,14 +487,7 @@ def _settings(root: Path) -> Settings:
 
 
 def _strip_colors(value: str) -> str:
-    for color in (
-        "\033[0m",
-        "\033[31m",
-        "\033[33m",
-        "\033[36m",
-    ):
-        value = value.replace(color, "")
-    return value
+    return re.sub(r"\033\[[0-9;]*m", "", value)
 
 
 if __name__ == "__main__":

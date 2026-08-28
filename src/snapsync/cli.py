@@ -16,21 +16,17 @@ from snapsync.timezone_correction import (
     TimezoneCorrectionPlan,
     describe_shift,
 )
-from snapsync.util.console import blue, cyan
+from snapsync.util.console import ICONS, format_path, print_key_values, print_section_heading, print_title
 
 
 def choose_interactive_action() -> str:
-    print(blue("================"))
-    print(blue(" 🎞️ snapsync 📤", bold=True))
-    print(blue("================"))
-    print()
-    print(cyan("Choose an action:", bold=True))
-    print(cyan("----------------"))
-    print("1️⃣  Audit files in this folder")
-    print("2️⃣  Fix audit issues in this folder")
-    print("3️⃣  Rename files in this folder")
-    print("4️⃣  Copy files to destination")
-    print("q. Quit")
+    print_title("snapsync", icon=ICONS["app"])
+    print_section_heading("Choose An Action")
+    print(f"1  {ICONS['audit']}  Audit files in this folder")
+    print(f"2  {ICONS['fix']}  Fix audit issues in this folder")
+    print(f"3  {ICONS['rename']}  Rename files in this folder")
+    print(f"4  {ICONS['copy']}  Copy files to destination")
+    print(f"q  {ICONS['back']}  Quit")
 
     choice = input("> ").strip().lower()
     if choice == "1":
@@ -47,31 +43,41 @@ def choose_interactive_action() -> str:
 def print_action_context(action: str, source_folder: Path, settings: Settings) -> None:
     print()
     if action == ACTION_AUDIT_FOLDER:
-        _print_action_heading("AUDIT FILES IN THIS FOLDER:")
-        print(f"🔎 Source folder: {source_folder}")
+        _print_action_heading("Audit Files In This Folder", icon=ICONS["audit"])
+        print_key_values([("Source folder", format_path(source_folder))])
     elif action == ACTION_FIX_AUDIT_ISSUES:
-        _print_action_heading("FIX AUDIT ISSUES IN THIS FOLDER:")
-        print(f"🔎 Source folder: {source_folder}")
+        _print_action_heading("Fix Audit Issues In This Folder", icon=ICONS["fix"])
+        print_key_values([("Source folder", format_path(source_folder))])
     elif action == ACTION_RENAME:
-        _print_action_heading("RENAME FILES IN THIS FOLDER:")
-        print(f"🔎 Source folder: {source_folder}")
-        print(f"🧾 Filename prefix: {settings.filename_prefix or '(none)'}")
-        print(f"#️⃣ Filename hash length: {settings.hash_length}")
+        _print_action_heading("Rename Files In This Folder", icon=ICONS["rename"])
+        print_key_values(
+            [
+                ("Source folder", format_path(source_folder)),
+                ("Filename prefix", settings.filename_prefix or "(none)"),
+                ("Filename hash length", settings.hash_length),
+            ]
+        )
     else:
-        _print_action_heading("COPY FILES TO DESTINATION:")
-        print(f"➡️ Source folder: {source_folder}")
-        print(f"⬅️ Copy destination folder: {settings.destination_folder}")
-    print(f"✳️ Dry Run : {'yes' if settings.dry_run else 'no'}")
+        _print_action_heading("Copy Files To Destination", icon=ICONS["copy"])
+        print_key_values(
+            [
+                ("Source folder", format_path(source_folder)),
+                ("Destination folder", format_path(settings.destination_folder)),
+            ]
+        )
+    print_key_values([("Dry run", "yes" if settings.dry_run else "no")])
 
 
 def confirm_timezone_correction(timezone_plan: TimezoneCorrectionPlan) -> bool:
-    print("")
-    print("Timezone correction")
-    print("-------------------")
-    print(f"Detected iPhone timezone offset: {timezone_plan.iphone_offset}")
-    print(f"Canon home timezone fallback: {timezone_plan.canon_home_timezone}")
-    print(f"Canon files needing correction: {len(timezone_plan.canon_files)}")
-    print(f"Canon filename/folder timestamp shift: {describe_shift(timezone_plan.canon_shift_minutes)}")
+    print_section_heading("Timezone Correction", icon=ICONS["fix"])
+    print_key_values(
+        [
+            ("Detected iPhone timezone offset", timezone_plan.iphone_offset),
+            ("Canon home timezone fallback", timezone_plan.canon_home_timezone),
+            ("Canon files needing correction", len(timezone_plan.canon_files)),
+            ("Canon filename/folder timestamp shift", describe_shift(timezone_plan.canon_shift_minutes)),
+        ]
+    )
     print("")
     print("Apply this correction to Canon files for this run?")
     if not sys.stdin.isatty():
@@ -82,7 +88,7 @@ def confirm_timezone_correction(timezone_plan: TimezoneCorrectionPlan) -> bool:
 
 
 class ProgressHeartbeat:
-    def __init__(self, label: str = "⏳ Still working...", interval: int = 50) -> None:
+    def __init__(self, label: str = f"{ICONS['progress']} Still working...", interval: int = 50) -> None:
         self.label = label
         self.interval = interval
         self.count = 0
@@ -93,6 +99,5 @@ class ProgressHeartbeat:
             print(self.label)
 
 
-def _print_action_heading(title: str) -> None:
-    print(cyan(title, bold=True))
-    print(cyan("-" * len(title)))
+def _print_action_heading(title: str, *, icon: str) -> None:
+    print_section_heading(title, icon=icon)

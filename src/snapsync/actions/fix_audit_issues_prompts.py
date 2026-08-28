@@ -22,15 +22,18 @@ from snapsync.metadata_audit import helsinki_rule_line
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
 from snapsync.util import logger
 from snapsync.util.console import (
+    ICONS,
+    changed_new,
+    changed_old,
     cyan,
     format_display_date,
     format_display_datetime,
-    green,
+    muted,
+    print_key_values,
     print_grouped_table,
+    print_notice,
     print_section_heading,
     print_table,
-    red,
-    yellow,
 )
 
 
@@ -49,8 +52,7 @@ EDIT_ONE_PATH = (*FIX_AUDIT_PATH, "Edit one file")
 
 def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count: int) -> None:
     _print_workflow_header(FIX_AUDIT_PATH)
-    print(cyan("Available repairs", bold=True))
-    print(cyan("-----------------"))
+    print_section_heading("Available Repairs", icon=ICONS["fix"])
     _print_table(
         ["Option", "Repair", "Files"],
         [
@@ -74,7 +76,7 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count:
 def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int:
     path = (*FIX_AUDIT_PATH, "Fix timezone mismatch")
     _print_workflow_header(path)
-    print_section_heading("Timezone Offset Fix Preview")
+    print_section_heading("Timezone Offset Fix Preview", icon=ICONS["fix"])
     _print_dry_run_notice(settings)
     if not fixes:
         print("No timezone offsets need fixing.")
@@ -127,7 +129,7 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
 def run_unknown_device_fix(files: list[DeviceFix], settings: Settings) -> int:
     path = (*FIX_AUDIT_PATH, "Set unknown device name")
     _print_workflow_header(path)
-    print_section_heading("Unknown Device Fix")
+    print_section_heading("Unknown Device Fix", icon=ICONS["fix"])
     _print_dry_run_notice(settings)
     if not files:
         print("No unknown devices need fixing.")
@@ -161,7 +163,7 @@ def run_manual_file_fix(
 ) -> int:
     path = EDIT_ONE_PATH
     _print_workflow_header(path)
-    print_section_heading("Manual Metadata Fix")
+    print_section_heading("Manual Metadata Fix", icon=ICONS["rename"])
     _print_dry_run_notice(settings)
     filename = _step_input("i.", "Enter filename", path=path, step_count="1 of 3")
     if not filename:
@@ -207,7 +209,7 @@ def run_bulk_metadata_fix(
 ) -> int:
     path = REPAIR_ALL_PATH
     _print_workflow_header(path)
-    print_section_heading("Repair All Scanned Files")
+    print_section_heading("Repair All Scanned Files", icon=ICONS["fix"])
     _print_dry_run_notice(settings)
     if not candidates:
         print("No files found to fix.")
@@ -248,7 +250,7 @@ def run_batch_metadata_repair(
 ) -> int:
     path = REPAIR_MATCHING_PATH
     _print_workflow_header(path)
-    print_section_heading("Repair Matching Files")
+    print_section_heading("Repair Matching Files", icon=ICONS["fix"])
     _print_dry_run_notice(settings)
     if not candidates:
         print("No files found to fix.")
@@ -799,8 +801,8 @@ def _metadata_matches_device_filter(
 
 
 def _print_bulk_preview(title: str, headers: list[str], rows: list[list[str]], group_values: list[str]) -> None:
-    print_section_heading(title)
-    print("Previewing affected files")
+    print_section_heading(title, icon=ICONS["audit"])
+    print(muted("Previewing affected files"))
     print()
     _print_file_table(headers, _color_preview_rows(headers, rows), group_values)
 
@@ -817,15 +819,15 @@ def _sort_candidates(candidates: list[Path], metadata_by_path: dict[Path, Metada
 
 
 def _changed_color(value: str) -> str:
-    return yellow(value)
+    return changed_new(value)
 
 
 def _old_value_color(value: str) -> str:
-    return red(value)
+    return changed_old(value)
 
 
 def _new_value_color(value: str) -> str:
-    return green(value)
+    return changed_new(value)
 
 
 def _color_preview_rows(headers: list[str], rows: list[list[str]]) -> list[list[str]]:
@@ -849,8 +851,11 @@ def _preview_value_color(header: str, value: str) -> str:
 
 def _print_dry_run_notice(settings: Settings) -> None:
     if settings.dry_run:
-        print("DRY RUN: no metadata will be written.")
-        print("DRY RUN: preview tables show planned values only.")
+        print_notice(
+            "DRY RUN",
+            "No metadata will be written. Preview tables show planned values only.",
+            icon=ICONS["warning"],
+        )
 
 
 def _metadata_confirmation_prompt(settings: Settings) -> str:
@@ -861,10 +866,10 @@ def _metadata_confirmation_prompt(settings: Settings) -> str:
 
 def _print_timezone_rules(fixes: list[TimezoneFix]) -> None:
     print_section_heading("Rules")
-    print(cyan("Timezone baseline: Europe/Helsinki"))
+    print_key_values([("Timezone baseline", "Europe/Helsinki")])
     for year in sorted({fix.selected_datetime.year for fix in fixes}):
         print(cyan(helsinki_rule_line(year)))
-    print(cyan(f"Timestamp priority: {' > '.join(TIMESTAMP_FIELDS)}"))
+    print_key_values([("Timestamp priority", " > ".join(TIMESTAMP_FIELDS))])
 
 
 def _print_device_fix_metadata(fix: DeviceFix) -> None:
@@ -1112,7 +1117,7 @@ def _print_workflow_header(path: tuple[str, ...], *, step_count: str | None = No
     print()
     print(cyan(" > ".join(path), bold=True))
     if step_count:
-        print(f"Step {step_count}")
+        print(muted(f"Step {step_count}"))
 
 
 def _files_label(count: int) -> str:

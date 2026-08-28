@@ -40,31 +40,47 @@ class DeviceChoice:
     used_custom_name: bool
 
 
+ROOT_PATH = ("snapsync",)
+FIX_AUDIT_PATH = (*ROOT_PATH, "Fix audit issues")
+REPAIR_ALL_PATH = (*FIX_AUDIT_PATH, "Repair all scanned files")
+REPAIR_MATCHING_PATH = (*FIX_AUDIT_PATH, "Repair matching files")
+EDIT_ONE_PATH = (*FIX_AUDIT_PATH, "Edit one file")
+
+
 def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count: int) -> None:
-    print_section_heading("Issue(s)")
+    _print_workflow_header(FIX_AUDIT_PATH)
+    print(cyan("Available repairs", bold=True))
+    print(cyan("-----------------"))
     _print_table(
-        ["Option", "Issue", "Files"],
+        ["Option", "Repair", "Files"],
         [
-            ["1", "Timezone mismatch/missing", str(timezone_count)],
-            ["2", "Unknown device", str(unknown_device_count)],
-            ["3", "Edit one file manually", "-"],
-            ["4", "Bulk repair date / time / timezone / device", str(bulk_count)],
-            ["5", "Batch repair date / time / timezone / device", str(bulk_count)],
+            ["1", "Fix timezone mismatch or missing offset", _files_label(timezone_count)],
+            ["2", "Set unknown device name", _files_label(unknown_device_count)],
+            ["3", "Edit metadata for one file", "-"],
+            ["4", "Repair all scanned files", _files_label(bulk_count)],
+            ["5", "Repair matching files", _files_label(bulk_count)],
         ],
     )
+    print()
+    if timezone_count == 0:
+        print("No timezone mismatch or missing offset issues found.")
+    if unknown_device_count == 0:
+        print("No unknown device name issues found.")
     print("q. Back")
     print()
-    print("Choose issue to fix:")
+    print("Choose repair:")
 
 
 def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int:
+    path = (*FIX_AUDIT_PATH, "Fix timezone mismatch")
+    _print_workflow_header(path)
     print_section_heading("Timezone Offset Fix Preview")
     _print_dry_run_notice(settings)
     if not fixes:
         print("No timezone offsets need fixing.")
         return 0
 
-    _print_step("i.", "Review timezone rules and preview")
+    _print_step("i.", "Review timezone rules and preview", path=path, step_count="1 of 2")
     _print_timezone_rules(fixes)
     print()
     rows = [
@@ -87,7 +103,7 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
         [format_display_date(fix.selected_datetime) for fix in fixes],
     )
     print()
-    if not _confirm_step("ii.", "Type yes to write timezone metadata"):
+    if not _confirm_step("ii.", "Type yes to write timezone metadata", path=path, step_count="2 of 2"):
         logger.warning("Timezone offset fix was not confirmed; no files were changed")
         return 0
 
@@ -109,6 +125,8 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
 
 
 def run_unknown_device_fix(files: list[DeviceFix], settings: Settings) -> int:
+    path = (*FIX_AUDIT_PATH, "Set unknown device name")
+    _print_workflow_header(path)
     print_section_heading("Unknown Device Fix")
     _print_dry_run_notice(settings)
     if not files:
@@ -117,9 +135,9 @@ def run_unknown_device_fix(files: list[DeviceFix], settings: Settings) -> int:
 
     errors = 0
     for fix in files:
-        _print_step("i.", "Review file")
+        _print_step("i.", "Review file", path=path, step_count="1 of 3")
         _print_device_fix_metadata(fix)
-        device_choice = _choose_batch_device_name()
+        device_choice = _choose_batch_device_name(path, step_marker="ii.", step_count="2 of 3")
         if not device_choice:
             print(f"Skipped {fix.path.name}")
             continue
@@ -141,9 +159,11 @@ def run_manual_file_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
+    path = EDIT_ONE_PATH
+    _print_workflow_header(path)
     print_section_heading("Manual Metadata Fix")
     _print_dry_run_notice(settings)
-    filename = _step_input("i.", "Enter filename")
+    filename = _step_input("i.", "Enter filename", path=path, step_count="1 of 3")
     if not filename:
         logger.info("No filename entered")
         return 0
@@ -155,22 +175,22 @@ def run_manual_file_fix(
     metadata = metadata_by_path[selected_path]
     _print_current_metadata(selected_path, metadata)
     print()
-    _print_step("ii.", "Choose metadata to edit")
-    print("a. Date")
-    print("b. Time")
-    print("c. Offset")
-    print("d. Device")
+    _print_step("ii.", "Choose what to change", path=path, step_count="2 of 3")
+    print("1. Change date")
+    print("2. Change time")
+    print("3. Change timezone offset")
+    print("4. Change device name")
     print()
     choice = input("> ").strip().lower()
 
     try:
-        if choice == "a":
+        if choice in {"1", "a"}:
             return _run_manual_date_fix(selected_path, metadata, settings)
-        if choice == "b":
+        if choice in {"2", "b"}:
             return _run_manual_time_fix(selected_path, metadata, settings)
-        if choice == "c":
+        if choice in {"3", "c"}:
             return _run_manual_offset_fix(selected_path, settings)
-        if choice == "d":
+        if choice in {"4", "d"}:
             return _run_manual_device_fix(selected_path, settings)
     except Exception as exc:
         logger.error(f"Could not update metadata for {selected_path.name}: {exc}")
@@ -185,17 +205,22 @@ def run_bulk_metadata_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    print_section_heading("Bulk Metadata Repair")
+    path = REPAIR_ALL_PATH
+    _print_workflow_header(path)
+    print_section_heading("Repair All Scanned Files")
     _print_dry_run_notice(settings)
     if not candidates:
         print("No files found to fix.")
         return 0
 
-    _print_step("i.", "Choose bulk metadata to edit")
-    print("1. Bulk repair date")
-    print("2. Bulk repair time")
-    print("3. Bulk repair timezone")
-    print("4. Bulk repair device")
+    _print_step("i.", "Choose what to change", path=path, step_count="1 of 3")
+    print("1. Change date")
+    print("2. Change time")
+    print("3. Change timezone offset")
+    print("4. Change device name")
+    print()
+    print("b. Back")
+    print("q. Quit")
     print()
 
     choice = input("> ").strip().lower()
@@ -221,18 +246,23 @@ def run_batch_metadata_repair(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    print_section_heading("Batch Repair Date / Time / Timezone / Device")
+    path = REPAIR_MATCHING_PATH
+    _print_workflow_header(path)
+    print_section_heading("Repair Matching Files")
     _print_dry_run_notice(settings)
     if not candidates:
         print("No files found to fix.")
         return 0
 
     print("Use this option when you need to fix metadata for only some files in this folder.")
-    _print_step("i.", "Choose batch metadata to edit")
-    print("1. Batch repair date")
-    print("2. Batch repair time")
-    print("3. Batch repair timezone")
-    print("4. Batch repair device")
+    _print_step("i.", "Choose what to change", path=path, step_count="1 of 5")
+    print("1. Change date")
+    print("2. Change time")
+    print("3. Change timezone offset")
+    print("4. Change device name")
+    print()
+    print("b. Back")
+    print("q. Quit")
     print()
 
     choice = input("> ").strip().lower()
@@ -258,9 +288,10 @@ def _run_batch_date_repair(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    old_date = _parse_date(_step_input("ii.", "Current date to find (DD-MM-YYYY)"))
-    new_date = _parse_date(_step_input("iii.", "New date (DD-MM-YYYY)"))
-    device_filter = _step_input("iv.", "Device name contains")
+    path = (*REPAIR_MATCHING_PATH, "Change date")
+    old_date = _parse_date(_step_input("ii.", "Current date to find (DD-MM-YYYY or YYYY-MM-DD)", path=path, step_count="2 of 5"))
+    new_date = _parse_date(_step_input("iii.", "New date (DD-MM-YYYY or YYYY-MM-DD)", path=path, step_count="3 of 5"))
+    device_filter = _step_input("iv.", "Device name contains", path=path, step_count="4 of 5")
     changes = _sort_candidates(
         [
             path
@@ -292,7 +323,7 @@ def _run_batch_date_repair(
         rows,
         _group_values(changes, metadata_by_path),
     )
-    if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
+    if not _confirm_step("v.", _metadata_confirmation_prompt(settings), path=path, step_count="5 of 5"):
         logger.warning("Batch date repair was not confirmed; no files were changed")
         return 0
 
@@ -310,9 +341,10 @@ def _run_batch_time_repair(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    old_time = _parse_time(_step_input("ii.", "Current time to find (HH:MM:SS)"))
-    new_time = _parse_time(_step_input("iii.", "New time (HH:MM:SS)"))
-    device_filter = _step_input("iv.", "Device name contains")
+    path = (*REPAIR_MATCHING_PATH, "Change time")
+    old_time = _parse_time(_step_input("ii.", "Current time to find (HH:MM:SS)", path=path, step_count="2 of 5"))
+    new_time = _parse_time(_step_input("iii.", "New time (HH:MM:SS)", path=path, step_count="3 of 5"))
+    device_filter = _step_input("iv.", "Device name contains", path=path, step_count="4 of 5")
     changes = _sort_candidates(
         [
             path
@@ -344,7 +376,7 @@ def _run_batch_time_repair(
         rows,
         _group_values(changes, metadata_by_path),
     )
-    if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
+    if not _confirm_step("v.", _metadata_confirmation_prompt(settings), path=path, step_count="5 of 5"):
         logger.warning("Batch time repair was not confirmed; no files were changed")
         return 0
 
@@ -362,17 +394,18 @@ def _run_batch_timezone_repair(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    old_offset = _step_input("ii.", "Current offset to find (+HH:MM or -HH:MM)")
+    path = (*REPAIR_MATCHING_PATH, "Change timezone offset")
+    old_offset = _step_input("ii.", "Current offset to find (+HH:MM or -HH:MM)", path=path, step_count="2 of 5")
     old_offset_minutes = parse_timezone_offset_minutes(old_offset)
     if old_offset_minutes is None:
         raise ValueError("current offset must use +HH:MM or -HH:MM")
 
-    new_offset = _step_input("iii.", "New offset (+HH:MM or -HH:MM)")
+    new_offset = _step_input("iii.", "New offset (+HH:MM or -HH:MM)", path=path, step_count="3 of 5")
     new_offset_minutes = parse_timezone_offset_minutes(new_offset)
     if new_offset_minutes is None:
         raise ValueError("new offset must use +HH:MM or -HH:MM")
 
-    device_filter = _step_input("iv.", "Device name contains")
+    device_filter = _step_input("iv.", "Device name contains", path=path, step_count="4 of 5")
     changes = _sort_candidates(
         [
             path
@@ -406,7 +439,7 @@ def _run_batch_timezone_repair(
         rows,
         _group_values(changes, metadata_by_path),
     )
-    if not _confirm_step("v.", _metadata_confirmation_prompt(settings)):
+    if not _confirm_step("v.", _metadata_confirmation_prompt(settings), path=path, step_count="5 of 5"):
         logger.warning("Batch timezone repair was not confirmed; no files were changed")
         return 0
 
@@ -424,10 +457,11 @@ def _run_batch_device_repair(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    old_device_filter = _step_input("ii.", "Current device name contains")
+    path = (*REPAIR_MATCHING_PATH, "Change device name")
+    old_device_filter = _step_input("ii.", "Current device name contains", path=path, step_count="2 of 4")
     if not old_device_filter:
         raise ValueError("current device filter is required")
-    new_device_name = _step_input("iii.", "New device name")
+    new_device_name = _step_input("iii.", "New device name", path=path, step_count="3 of 4")
     if not new_device_name:
         raise ValueError("new device name is required")
 
@@ -458,7 +492,7 @@ def _run_batch_device_repair(
         rows,
         _group_values(changes, metadata_by_path),
     )
-    if not _confirm_step("iv.", _metadata_confirmation_prompt(settings)):
+    if not _confirm_step("iv.", _metadata_confirmation_prompt(settings), path=path, step_count="4 of 4"):
         logger.warning("Batch device repair was not confirmed; no files were changed")
         return 0
 
@@ -475,7 +509,8 @@ def _run_bulk_date_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    value = _step_input("ii.", "Enter new date (DD-MM-YYYY)")
+    path = (*REPAIR_ALL_PATH, "Change date")
+    value = _step_input("ii.", "New date (DD-MM-YYYY or YYYY-MM-DD)", path=path, step_count="2 of 3")
     new_date = _parse_date(value)
     changes = _sort_candidates(candidates, metadata_by_path)
     rows = [
@@ -494,7 +529,7 @@ def _run_bulk_date_fix(
         rows,
         _group_values(changes, metadata_by_path),
     )
-    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
+    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings), path=path, step_count="3 of 3"):
         logger.warning("Bulk date fix was not confirmed; no files were changed")
         return 0
 
@@ -512,7 +547,8 @@ def _run_bulk_time_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    value = _step_input("ii.", "Enter new time (HH:MM:SS)")
+    path = (*REPAIR_ALL_PATH, "Change time")
+    value = _step_input("ii.", "New time (HH:MM:SS)", path=path, step_count="2 of 3")
     new_time = _parse_time(value)
     changes = _sort_candidates(candidates, metadata_by_path)
     rows = [
@@ -531,7 +567,7 @@ def _run_bulk_time_fix(
         rows,
         _group_values(changes, metadata_by_path),
     )
-    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
+    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings), path=path, step_count="3 of 3"):
         logger.warning("Bulk time fix was not confirmed; no files were changed")
         return 0
 
@@ -549,7 +585,8 @@ def _run_bulk_timezone_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    new_offset = _step_input("ii.", "Enter new offset (+HH:MM or -HH:MM)")
+    path = (*REPAIR_ALL_PATH, "Change timezone offset")
+    new_offset = _step_input("ii.", "New offset (+HH:MM or -HH:MM)", path=path, step_count="2 of 3")
     new_offset_minutes = parse_timezone_offset_minutes(new_offset)
     if new_offset_minutes is None:
         raise ValueError("offset must use +HH:MM or -HH:MM")
@@ -580,7 +617,7 @@ def _run_bulk_timezone_fix(
         rows,
         _group_values(changes, metadata_by_path),
     )
-    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings)):
+    if not _confirm_step("iii.", _metadata_confirmation_prompt(settings), path=path, step_count="3 of 3"):
         logger.warning("Bulk timezone fix was not confirmed; no files were changed")
         return 0
 
@@ -598,7 +635,8 @@ def _run_bulk_device_fix(
     metadata_by_path: dict[Path, Metadata],
     settings: Settings,
 ) -> int:
-    device_choice = _choose_bulk_device_name()
+    path = (*REPAIR_ALL_PATH, "Change device name")
+    device_choice = _choose_bulk_device_name(path)
     if not device_choice:
         print("Skipped bulk device fix")
         return 0
@@ -621,7 +659,8 @@ def _run_bulk_device_fix(
         _group_values(changes, metadata_by_path),
     )
     confirmation_step = "iv." if device_choice.used_custom_name else "iii."
-    if not _confirm_step(confirmation_step, _metadata_confirmation_prompt(settings)):
+    confirmation_count = "4 of 4" if device_choice.used_custom_name else "3 of 3"
+    if not _confirm_step(confirmation_step, _metadata_confirmation_prompt(settings), path=path, step_count=confirmation_count):
         logger.warning("Bulk device fix was not confirmed; no files were changed")
         return 0
 
@@ -891,26 +930,29 @@ def _print_current_metadata(path: Path, metadata: Metadata) -> None:
 
 
 def _run_manual_date_fix(path: Path, metadata: Metadata, settings: Settings) -> int:
-    value = _step_input("iii.", "New date (DD-MM-YYYY)")
+    workflow_path = (*EDIT_ONE_PATH, "Change date")
+    value = _step_input("iii.", "New date (DD-MM-YYYY or YYYY-MM-DD)", path=workflow_path, step_count="3 of 4")
     new_date = _parse_date(value)
     new_datetime = datetime.combine(new_date, metadata.selected_datetime.time())
-    return _write_manual_datetime_change(path, metadata, new_datetime, settings, "iv.")
+    return _write_manual_datetime_change(path, metadata, new_datetime, settings, "iv.", workflow_path)
 
 
 def _run_manual_time_fix(path: Path, metadata: Metadata, settings: Settings) -> int:
-    value = _step_input("iii.", "New time (HH:MM:SS)")
+    workflow_path = (*EDIT_ONE_PATH, "Change time")
+    value = _step_input("iii.", "New time (HH:MM:SS)", path=workflow_path, step_count="3 of 4")
     new_time = _parse_time(value)
     new_datetime = datetime.combine(metadata.selected_datetime.date(), new_time)
-    return _write_manual_datetime_change(path, metadata, new_datetime, settings, "iv.")
+    return _write_manual_datetime_change(path, metadata, new_datetime, settings, "iv.", workflow_path)
 
 
 def _run_manual_offset_fix(path: Path, settings: Settings) -> int:
-    offset = _step_input("iii.", "New offset (+HH:MM or -HH:MM)")
+    workflow_path = (*EDIT_ONE_PATH, "Change timezone offset")
+    offset = _step_input("iii.", "New offset (+HH:MM or -HH:MM)", path=workflow_path, step_count="3 of 4")
     if parse_timezone_offset_minutes(offset) is None:
         raise ValueError("offset must use +HH:MM or -HH:MM")
 
     print(f"Will change offset for {path.name} to {offset}")
-    if not _confirm_step("iv.", "Type yes to write metadata"):
+    if not _confirm_step("iv.", "Type yes to write metadata", path=workflow_path, step_count="4 of 4"):
         logger.warning("Manual offset fix was not confirmed; no files were changed")
         return 0
 
@@ -922,14 +964,16 @@ def _run_manual_offset_fix(path: Path, settings: Settings) -> int:
 
 
 def _run_manual_device_fix(path: Path, settings: Settings) -> int:
-    device_choice = _choose_manual_device_name()
+    workflow_path = (*EDIT_ONE_PATH, "Change device name")
+    device_choice = _choose_manual_device_name(workflow_path)
     if not device_choice:
         print(f"Skipped {path.name}")
         return 0
 
     print(f"Will set Model for {path.name} to {device_choice.name}")
     confirmation_step = "v." if device_choice.used_custom_name else "iv."
-    if not _confirm_step(confirmation_step, "Type yes to write metadata"):
+    confirmation_count = "5 of 5" if device_choice.used_custom_name else "4 of 4"
+    if not _confirm_step(confirmation_step, "Type yes to write metadata", path=workflow_path, step_count=confirmation_count):
         logger.warning("Manual device fix was not confirmed; no files were changed")
         return 0
 
@@ -946,12 +990,13 @@ def _write_manual_datetime_change(
     new_datetime: datetime,
     settings: Settings,
     confirmation_step: str,
+    workflow_path: tuple[str, ...],
 ) -> int:
     print(
         f"Will change {path.name}: "
         f"{format_display_datetime(metadata.selected_datetime)} -> {format_display_datetime(new_datetime)}"
     )
-    if not _confirm_step(confirmation_step, "Type yes to write metadata"):
+    if not _confirm_step(confirmation_step, "Type yes to write metadata", path=workflow_path, step_count="4 of 4"):
         logger.warning("Manual date/time fix was not confirmed; no files were changed")
         return 0
 
@@ -978,8 +1023,14 @@ def _parse_time(value: str) -> time:
         raise ValueError("time must use HH:MM:SS") from exc
 
 
-def _choose_batch_device_name() -> DeviceChoice | None:
-    _print_step("ii.", "Select one of the following")
+def _choose_batch_device_name(
+    path: tuple[str, ...] | None = None,
+    *,
+    step_marker: str = "ii.",
+    step_count: str | None = None,
+    custom_step_count: str = "3 of 3",
+) -> DeviceChoice | None:
+    _print_step(step_marker, "Choose device value", path=path, step_count=step_count)
     print("a. WhatsApp")
     print("b. Type the device name")
     print()
@@ -989,7 +1040,7 @@ def _choose_batch_device_name() -> DeviceChoice | None:
     if choice == "a":
         return DeviceChoice("WhatsApp", used_custom_name=False)
     if choice == "b":
-        device_name = _step_input("iii.", "Device name")
+        device_name = _step_input("iii.", "Device name", path=path, step_count=custom_step_count)
         if not device_name:
             return None
         return DeviceChoice(device_name, used_custom_name=True)
@@ -998,12 +1049,12 @@ def _choose_batch_device_name() -> DeviceChoice | None:
     return None
 
 
-def _choose_bulk_device_name() -> DeviceChoice | None:
-    return _choose_batch_device_name()
+def _choose_bulk_device_name(path: tuple[str, ...]) -> DeviceChoice | None:
+    return _choose_batch_device_name(path, step_marker="ii.", step_count="2 of 3", custom_step_count="3 of 4")
 
 
-def _choose_manual_device_name() -> DeviceChoice | None:
-    _print_step("iii.", "Select one of the following")
+def _choose_manual_device_name(path: tuple[str, ...]) -> DeviceChoice | None:
+    _print_step("iii.", "Choose device value", path=path, step_count="3 of 4")
     print("a. WhatsApp")
     print("b. Type the device name")
     print()
@@ -1013,7 +1064,7 @@ def _choose_manual_device_name() -> DeviceChoice | None:
     if choice == "a":
         return DeviceChoice("WhatsApp", used_custom_name=False)
     if choice == "b":
-        device_name = _step_input("iv.", "Device name")
+        device_name = _step_input("iv.", "Device name", path=path, step_count="4 of 5")
         if not device_name:
             return None
         return DeviceChoice(device_name, used_custom_name=True)
@@ -1022,19 +1073,54 @@ def _choose_manual_device_name() -> DeviceChoice | None:
     return None
 
 
-def _confirm_step(marker: str, prompt: str) -> bool:
-    return _step_input(marker, prompt).lower() == "yes"
+def _confirm_step(
+    marker: str,
+    prompt: str,
+    *,
+    path: tuple[str, ...] | None = None,
+    step_count: str | None = None,
+) -> bool:
+    return _step_input(marker, prompt, path=path, step_count=step_count).lower() == "yes"
 
 
-def _step_input(marker: str, prompt: str) -> str:
-    _print_step(marker, prompt)
+def _step_input(
+    marker: str,
+    prompt: str,
+    *,
+    path: tuple[str, ...] | None = None,
+    step_count: str | None = None,
+) -> str:
+    _print_step(marker, prompt, path=path, step_count=step_count)
     return input("> ").strip()
 
 
-def _print_step(marker: str, text: str) -> None:
+def _print_step(
+    marker: str,
+    text: str,
+    *,
+    path: tuple[str, ...] | None = None,
+    step_count: str | None = None,
+) -> None:
+    if path:
+        _print_workflow_header(path, step_count=step_count)
     print()
     print(f"{_step_color(marker)} {text}:")
     print()
+
+
+def _print_workflow_header(path: tuple[str, ...], *, step_count: str | None = None) -> None:
+    print()
+    print(cyan(" > ".join(path), bold=True))
+    if step_count:
+        print(f"Step {step_count}")
+
+
+def _files_label(count: int) -> str:
+    if count == 0:
+        return "no issues found"
+    if count == 1:
+        return "1 file"
+    return f"{count} files"
 
 
 def _step_color(value: str) -> str:

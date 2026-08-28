@@ -25,7 +25,7 @@ def choose_interactive_action() -> str:
     print(blue("================"))
     print()
     print(cyan("Choose an action:", bold=True))
-    print(cyan("-----------------"))
+    print(cyan("----------------"))
     print("1️⃣  Audit files in this folder")
     print("2️⃣  Fix audit issues in this folder")
     print("3️⃣  Rename files in this folder")

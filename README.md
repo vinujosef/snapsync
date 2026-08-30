@@ -70,6 +70,8 @@ q. Quit
 - `3` Rename files:
   Renames media in place using the current metadata.
   It does not copy files or edit metadata.
+  The rename preview follows the same diff colors: old filenames are red and
+  new filenames are green.
 
 - `4` Copy files:
   Copies media into `DESTINATION_FOLDER`, preserving current filenames.

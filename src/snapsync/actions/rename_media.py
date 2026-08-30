@@ -14,7 +14,7 @@ from snapsync.renamer import generate_filename
 from snapsync.scanner import scan_source
 from snapsync.summary import RunSummary
 from snapsync.util import logger
-from snapsync.util.console import format_display_date, print_grouped_table
+from snapsync.util.console import changed_new, changed_old, format_display_date, print_grouped_table
 
 
 @dataclass(frozen=True)
@@ -131,7 +131,7 @@ def _rename_target(source_path: Path, filename: str) -> Path:
 def _print_rename_table(changes: list[RenameChange]) -> None:
     headers = ["#", "Old name", "New name", "Date", "Fingerprint"]
     rows = [
-        [str(index), change.old_name, change.new_name, change.taken_date, change.fingerprint]
+        [str(index), changed_old(change.old_name), changed_new(change.new_name), change.taken_date, change.fingerprint]
         for index, change in enumerate(changes, start=1)
     ]
     print_grouped_table(headers, rows, [change.taken_date for change in changes])

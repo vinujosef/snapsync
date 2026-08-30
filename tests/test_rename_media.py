@@ -11,6 +11,7 @@ import unittest
 from config.settings import Settings
 from snapsync.actions.rename_media import run_media_rename
 from snapsync.metadata import Metadata
+from snapsync.util.console import GREEN, RED, RESET
 
 
 class RenameMediaTests(unittest.TestCase):
@@ -53,6 +54,8 @@ class RenameMediaTests(unittest.TestCase):
             self.assertIn("Date", output.getvalue())
             self.assertIn("Fingerprint", output.getvalue())
             self.assertIn(f"1 IMG_0001.JPG {expected.name}", _compact(text))
+            self.assertIn(f"{RED}IMG_0001.JPG{RESET}", output.getvalue())
+            self.assertIn(f"{GREEN}{expected.name}{RESET}", output.getvalue())
 
     def test_rename_respects_dry_run(self):
         with TemporaryDirectory() as temp_dir:

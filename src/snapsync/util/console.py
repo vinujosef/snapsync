@@ -53,7 +53,7 @@ class ConsoleTheme:
     success: str = GREEN
     warning: str = YELLOW
     danger: str = RED
-    changed_old: str = YELLOW
+    changed_old: str = RED
     changed_new: str = GREEN
 
 

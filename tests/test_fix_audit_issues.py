@@ -320,8 +320,10 @@ class FixAuditIssuesTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             run.assert_not_called()
-            self.assertIn("No metadata will be written.", output.getvalue())
-            self.assertIn("Would update IMG_2026.JPG: (none) -> +03:00", output.getvalue())
+            text = output.getvalue()
+            self.assertIn("No metadata will be written.", text)
+            self.assertIn("\033[31m(none)\033[0m", text)
+            self.assertIn("Would update IMG_2026.JPG: (none) -> +03:00", text)
 
     def test_timezone_fix_preview_orders_by_date_time_then_filename(self):
         with TemporaryDirectory() as temp_dir:
@@ -972,6 +974,8 @@ class FixAuditIssuesTests(unittest.TestCase):
             compact_text = _compact(_strip_colors(text))
             self.assertIn("Filename Old Date New Date", compact_text)
             self.assertIn("wrong-day.jpg 05-01-2026 26-08-2026", compact_text)
+            self.assertIn("\033[31m05-01-2026\033[0m", text)
+            self.assertIn("\033[32m26-08-2026\033[0m", text)
             self.assertIn("wrong-day.jpg 26-08-2026 12:00:00 DateTimeOriginal +02:00 UnknownDevice", compact_text)
 
     def test_bulk_time_fix_previews_change_and_highlights_final_time(self):

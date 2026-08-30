@@ -8,6 +8,7 @@ from config.settings import Settings
 from snapsync.file_fingerprint import file_fingerprint
 from snapsync.metadata import Metadata, TIMESTAMP_FIELDS
 from snapsync.metadata_audit import (
+    expected_helsinki_offset,
     helsinki_rule_line,
     metadata_warnings,
     metadata_years,
@@ -43,10 +44,11 @@ def run_folder_audit(source_folder: Path, settings: Settings) -> int:
         return 0
 
     sorted_candidates = _sort_paths_by_taken_at(candidates, metadata_by_path)
-    rows = [_metadata_row(path, metadata_by_path[path]) for path in sorted_candidates]
+    timezone_reference_offsets = _timezone_reference_offsets(metadata_by_path)
+    rows = [_metadata_row(path, metadata_by_path[path], timezone_reference_offsets) for path in sorted_candidates]
     print_section_heading("Audit Details", icon=ICONS["audit"])
     _print_table(rows)
-    _print_issues_section(sorted_candidates, metadata_by_path)
+    _print_issues_section(sorted_candidates, metadata_by_path, timezone_reference_offsets)
     return 0
 
 
@@ -61,21 +63,21 @@ def _sort_paths_by_taken_at(candidates: list[Path], metadata_by_path: dict[Path,
     )
 
 
-def _metadata_row(path: Path, metadata: Metadata) -> list[str]:
+def _metadata_row(path: Path, metadata: Metadata, timezone_reference_offsets: set[str]) -> list[str]:
     taken_at = metadata.selected_datetime
     return [
-        _file_cell(path, metadata),
+        _file_cell(path, metadata, timezone_reference_offsets),
         format_display_date(taken_at),
         taken_at.strftime("%H:%M:%S"),
         _timestamp_field_cell(metadata),
-        _timezone_cell(metadata),
+        _timezone_cell(metadata, timezone_reference_offsets),
         _device_cell(metadata),
         file_fingerprint(path, metadata),
     ]
 
 
-def _file_cell(path: Path, metadata: Metadata) -> str:
-    warnings = metadata_warnings(metadata)
+def _file_cell(path: Path, metadata: Metadata, timezone_reference_offsets: set[str]) -> str:
+    warnings = _audit_warnings(metadata, timezone_reference_offsets)
     if warnings & {"timezone", "device"}:
         return f"{ICONS['warning']} {danger(path.name)}"
     if "timestamp" in warnings:
@@ -95,10 +97,30 @@ def _device_cell(metadata: Metadata) -> str:
     return metadata.device_name
 
 
-def _timezone_cell(metadata: Metadata) -> str:
-    if timezone_has_warning(metadata):
+def _timezone_cell(metadata: Metadata, timezone_reference_offsets: set[str]) -> str:
+    if _timezone_warning_is_supported(metadata, timezone_reference_offsets):
         return danger(metadata.timezone_offset or "(none)")
     return metadata.timezone_offset or "(none)"
+
+
+def _audit_warnings(metadata: Metadata, timezone_reference_offsets: set[str]) -> set[str]:
+    warnings = metadata_warnings(metadata)
+    if not _timezone_warning_is_supported(metadata, timezone_reference_offsets):
+        warnings.discard("timezone")
+    return warnings
+
+
+def _timezone_warning_is_supported(metadata: Metadata, timezone_reference_offsets: set[str]) -> bool:
+    expected_offset = expected_helsinki_offset(metadata.selected_datetime)
+    return expected_offset in timezone_reference_offsets and timezone_has_warning(metadata)
+
+
+def _timezone_reference_offsets(metadata_by_path: dict[Path, Metadata]) -> set[str]:
+    return {
+        metadata.timezone_offset
+        for metadata in metadata_by_path.values()
+        if metadata.timezone_offset in {"+02:00", "+03:00"}
+    }
 
 
 def _print_info_section(file_count: int) -> None:
@@ -117,11 +139,13 @@ def _print_rules_section(metadata_by_path: dict[Path, Metadata]) -> None:
     print_key_values([("Timestamp priority", " > ".join(TIMESTAMP_FIELDS))])
 
 
-def _print_issues_section(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> None:
+def _print_issues_section(
+    candidates: list[Path], metadata_by_path: dict[Path, Metadata], timezone_reference_offsets: set[str]
+) -> None:
     warning_counts: Counter[str] = Counter()
 
     for path in candidates:
-        warnings = metadata_warnings(metadata_by_path[path])
+        warnings = _audit_warnings(metadata_by_path[path], timezone_reference_offsets)
         warning_counts.update(warnings)
 
     print_section_heading("Issues", icon=ICONS["warning"])

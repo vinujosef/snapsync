@@ -195,11 +195,20 @@ class AuditFolderTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             photo = root / "IMG_2025.JPG"
+            reference = root / "IMG_2025_REFERENCE.JPG"
             photo.write_bytes(b"photo")
+            reference.write_bytes(b"photo")
             settings = _settings(root)
             output = StringIO()
 
             metadata_by_path = {
+                reference: Metadata(
+                    selected_datetime=datetime(2025, 7, 3, 10, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="Canon EOS M50",
+                    quality="metadata",
+                    timezone_offset="+03:00",
+                ),
                 photo: Metadata(
                     selected_datetime=datetime(2025, 7, 3, 10, 30, 0),
                     timestamp_field="DateTimeOriginal",
@@ -221,6 +230,125 @@ class AuditFolderTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertIn("\033[31m+02:00\033[0m", output.getvalue())
             self.assertIn("\033[31mIMG_2025.JPG\033[0m", output.getvalue())
+
+    def test_keeps_timezone_plain_when_no_matching_helsinki_reference_offset_exists(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "IMG_2026.JPG"
+            photo.write_bytes(b"photo")
+            settings = _settings(root)
+            output = StringIO()
+
+            metadata_by_path = {
+                photo: Metadata(
+                    selected_datetime=datetime(2026, 6, 25, 10, 16, 13),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 13 Pro",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.audit_folder.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_folder_audit(root, settings)
+
+            text = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn(
+                "IMG_2026.JPG 25-06-2026 10:16:13 DateTimeOriginal +05:30 iPhone 13 Pro",
+                _compact(_strip_colors(text)),
+            )
+            self.assertNotIn("\033[31m+05:30\033[0m", text)
+            self.assertNotIn("\033[31mIMG_2026.JPG\033[0m", text)
+            self.assertIn("Timezone mismatch/missing       0", _strip_colors(text))
+
+    def test_keeps_winter_timezone_plain_when_only_summer_reference_exists(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "IMG_WINTER.JPG"
+            summer_reference = root / "IMG_SUMMER.JPG"
+            photo.write_bytes(b"photo")
+            summer_reference.write_bytes(b"photo")
+            settings = _settings(root)
+            output = StringIO()
+
+            metadata_by_path = {
+                summer_reference: Metadata(
+                    selected_datetime=datetime(2026, 6, 25, 10, 16, 13),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 13 Pro",
+                    quality="metadata",
+                    timezone_offset="+03:00",
+                ),
+                photo: Metadata(
+                    selected_datetime=datetime(2026, 1, 5, 10, 16, 13),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 13 Pro",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.audit_folder.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_folder_audit(root, settings)
+
+            text = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertNotIn("\033[31m+05:30\033[0m", text)
+            self.assertNotIn("\033[31mIMG_WINTER.JPG\033[0m", text)
+            self.assertIn("Timezone mismatch/missing       0", _strip_colors(text))
+
+    def test_marks_winter_timezone_red_when_winter_reference_exists(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "IMG_WINTER.JPG"
+            winter_reference = root / "IMG_WINTER_REFERENCE.JPG"
+            photo.write_bytes(b"photo")
+            winter_reference.write_bytes(b"photo")
+            settings = _settings(root)
+            output = StringIO()
+
+            metadata_by_path = {
+                winter_reference: Metadata(
+                    selected_datetime=datetime(2026, 1, 5, 10, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 13 Pro",
+                    quality="metadata",
+                    timezone_offset="+02:00",
+                ),
+                photo: Metadata(
+                    selected_datetime=datetime(2026, 1, 5, 10, 16, 13),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 13 Pro",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.audit_folder.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_folder_audit(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("\033[31m+05:30\033[0m", output.getvalue())
+            self.assertIn("\033[31mIMG_WINTER.JPG\033[0m", output.getvalue())
 
     def test_keeps_timezone_plain_when_it_matches_helsinki_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -325,11 +453,20 @@ class AuditFolderTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             photo = root / "missing-timezone.jpg"
+            reference = root / "reference.jpg"
             photo.write_bytes(b"photo")
+            reference.write_bytes(b"photo")
             settings = _settings(root)
             output = StringIO()
 
             metadata_by_path = {
+                reference: Metadata(
+                    selected_datetime=datetime(2026, 1, 5, 11, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+02:00",
+                ),
                 photo: Metadata(
                     selected_datetime=datetime(2026, 1, 5, 12, 0, 0),
                     timestamp_field="DateTimeOriginal",
@@ -357,12 +494,20 @@ class AuditFolderTests(unittest.TestCase):
             clean = root / "clean.jpg"
             messy = root / "messy.jpg"
             missing_timezone = root / "missing-timezone.jpg"
-            for path in (clean, messy, missing_timezone):
+            reference = root / "reference.jpg"
+            for path in (clean, messy, missing_timezone, reference):
                 path.write_bytes(b"photo")
             settings = _settings(root)
             output = StringIO()
 
             metadata_by_path = {
+                reference: Metadata(
+                    selected_datetime=datetime(2026, 5, 5, 11, 0, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+03:00",
+                ),
                 clean: Metadata(
                     selected_datetime=datetime(2026, 1, 5, 12, 0, 0),
                     timestamp_field="DateTimeOriginal",

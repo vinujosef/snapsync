@@ -34,6 +34,7 @@ from snapsync.util.console import (
     print_notice,
     print_section_heading,
     print_table,
+    yellow,
 )
 
 
@@ -138,19 +139,18 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
         return 0
 
     errors = 0
+    updated_fixes: list[TimezoneFix] = []
     for fix in selected_fixes:
         try:
             if not settings.dry_run:
                 write_timezone_offset(fix.path, fix.expected_offset, settings)
                 verify_timezone_offset(fix.path, fix.expected_offset, settings)
-            print(
-                f"{_completion_label('Updated', settings)} {fix.path.name}: "
-                f"{fix.current_offset} -> {fix.expected_offset}"
-            )
+            updated_fixes.append(fix)
         except Exception as exc:
             errors += 1
             logger.error(f"Could not update timezone for {fix.path.name}: {exc}")
 
+    _print_timezone_fix_result(updated_fixes, settings)
     return 0 if errors == 0 else 1
 
 
@@ -193,6 +193,37 @@ def _choose_timezone_offset_fixes(
 
 def _missing_offset_fixes(fixes: list[TimezoneFix]) -> list[TimezoneFix]:
     return [fix for fix in fixes if fix.current_offset == "(none)"]
+
+
+def _print_timezone_fix_result(fixes: list[TimezoneFix], settings: Settings) -> None:
+    if settings.dry_run:
+        print_section_heading("Dry Run Timezone Offset Preview")
+        print("DRY RUN: no metadata was written.")
+    else:
+        print_section_heading("Updated Timezone Offsets")
+
+    if not fixes:
+        print("No timezone offsets were updated.")
+        return
+
+    headers = ["Filename", "Date", "Time", "Taken From", "Offset", "Device", "Fingerprint"]
+    rows = [
+        [
+            fix.path.name,
+            format_display_date(fix.selected_datetime),
+            fix.selected_datetime.strftime("%H:%M:%S"),
+            fix.timestamp_field,
+            yellow(fix.expected_offset),
+            fix.device_name,
+            file_fingerprint(fix.path, _metadata_from_timezone_fix(fix)),
+        ]
+        for fix in fixes
+    ]
+    _print_file_table(
+        headers,
+        _color_preview_rows(headers, rows),
+        [format_display_date(fix.selected_datetime) for fix in fixes],
+    )
 
 
 def run_unknown_device_fix(files: list[DeviceFix], settings: Settings) -> int:
@@ -888,7 +919,7 @@ def _sort_candidates(candidates: list[Path], metadata_by_path: dict[Path, Metada
 
 
 def _changed_color(value: str) -> str:
-    return changed_new(value)
+    return yellow(value)
 
 
 def _old_value_color(value: str) -> str:
@@ -1249,7 +1280,7 @@ def _group_values(paths: list[Path], metadata_by_path: dict[Path, Metadata]) -> 
 def _metadata_from_timezone_fix(fix: TimezoneFix) -> Metadata:
     return Metadata(
         selected_datetime=fix.selected_datetime,
-        timestamp_field="DateTimeOriginal",
+        timestamp_field=fix.timestamp_field,
         device_name=fix.device_name,
         quality="metadata",
         timezone_offset=fix.current_offset if fix.current_offset != "(none)" else None,

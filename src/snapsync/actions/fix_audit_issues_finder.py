@@ -13,6 +13,7 @@ from snapsync.metadata_audit import expected_helsinki_offset, metadata_warnings
 class TimezoneFix:
     path: Path
     selected_datetime: datetime
+    timestamp_field: str
     device_name: str
     current_offset: str
     expected_offset: str
@@ -44,6 +45,7 @@ def timezone_fixes(candidates: list[Path], metadata_by_path: dict[Path, Metadata
             TimezoneFix(
                 path=path,
                 selected_datetime=metadata.selected_datetime,
+                timestamp_field=metadata.timestamp_field,
                 device_name=metadata.device_name,
                 current_offset=metadata.timezone_offset or "(none)",
                 expected_offset=expected_helsinki_offset(metadata.selected_datetime),

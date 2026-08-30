@@ -41,6 +41,11 @@ The correction does not edit embedded metadata.
 The audit fix workflow offers both bulk and batch metadata repair. This is
 separate from copy-time Canon correction because it edits embedded metadata.
 
+Preview tables use diff colors: old or current values being replaced are red,
+and new values planned for writing are green. After confirmed repairs, snapsync
+prints a full final metadata table and highlights the changed final value in
+yellow.
+
 Bulk repair changes every media file in the folder. Batch repair changes only
 files that match the user's filter. Bulk and batch timezone repair both move
 the clock time by the offset difference.

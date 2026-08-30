@@ -63,6 +63,9 @@ q. Quit
   Repairs selected metadata issues after a preview and confirmation.
   Available fixes include timezone offset, unknown device, one-file manual
   edits, bulk repairs, and batch repairs.
+  Preview tables show old/current values in red and new values in green.
+  After confirmed fixes, snapsync prints a full metadata result table and
+  highlights the changed final value in yellow.
 
 - `3` Rename files:
   Renames media in place using the current metadata.

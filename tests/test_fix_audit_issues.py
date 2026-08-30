@@ -11,7 +11,7 @@ import unittest
 from config.settings import Settings
 from snapsync.actions.fix_audit_issues import run_audit_issue_fix
 from snapsync.metadata import Metadata
-from snapsync.util.console import GREEN, RESET
+from snapsync.util.console import RESET, YELLOW
 
 
 class FixAuditIssuesTests(unittest.TestCase):
@@ -94,7 +94,14 @@ class FixAuditIssuesTests(unittest.TestCase):
                 _compact(_strip_colors(text)),
             )
             self.assertIn("iii.\033[0m Type yes to write timezone metadata:", text)
-            self.assertIn("Updated IMG_2026.JPG: +02:00 -> +03:00", text)
+            self.assertIn("Updated Timezone Offsets", _strip_colors(text))
+            self.assertIn(
+                "IMG_2026.JPG 19-04-2026 10:38:13 DateTimeOriginal +03:00 Canon EOS M50",
+                _compact(_strip_colors(text)),
+            )
+            self.assertIn("\033[31m+02:00\033[0m", text)
+            self.assertIn("\033[32m+03:00\033[0m", text)
+            self.assertIn("\033[33m+03:00\033[0m", text)
 
     def test_fixes_missing_video_timezone_with_creation_date_and_verifies_readback(self):
         with TemporaryDirectory() as temp_dir:
@@ -156,7 +163,10 @@ class FixAuditIssuesTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertIn("Updated clip.mp4: (none) -> +03:00", output.getvalue())
+            self.assertIn(
+                "clip.mp4 17-05-2026 12:15:45 CreateDate +03:00 UnknownDevice",
+                _compact(_strip_colors(output.getvalue())),
+            )
 
     def test_timezone_fix_missing_only_leaves_existing_offsets_unchanged(self):
         with TemporaryDirectory() as temp_dir:
@@ -205,8 +215,11 @@ class FixAuditIssuesTests(unittest.TestCase):
             run.assert_called_once()
             self.assertEqual(run.call_args.args[0][-1], str(missing))
             text = output.getvalue()
-            self.assertIn("Updated missing.jpg: (none) -> +03:00", text)
-            self.assertNotIn("Updated india.jpg", text)
+            self.assertIn(
+                "missing.jpg 13-07-2026 15:58:00 DateTimeOriginal +03:00 iPhone 13 Pro",
+                _compact(_strip_colors(text)),
+            )
+            self.assertNotIn("india.jpg 13-07-2026", _compact(_strip_colors(text)).split("Updated Timezone Offsets")[-1])
 
     def test_timezone_fix_missing_only_can_use_custom_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -247,7 +260,11 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             self.assertIn("iii.\033[0m Review timezone rules and preview:", text)
             self.assertIn("iv.\033[0m Type yes to write timezone metadata:", text)
-            self.assertIn("Updated missing.jpg: (none) -> +05:30", text)
+            self.assertIn(
+                "missing.jpg 13-07-2026 15:58:00 DateTimeOriginal +05:30 iPhone 13 Pro",
+                _compact(_strip_colors(text)),
+            )
+            self.assertIn("\033[33m+05:30\033[0m", text)
 
     def test_reports_error_when_timezone_write_does_not_read_back(self):
         with TemporaryDirectory() as temp_dir:
@@ -323,7 +340,12 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             self.assertIn("No metadata will be written.", text)
             self.assertIn("\033[31m(none)\033[0m", text)
-            self.assertIn("Would update IMG_2026.JPG: (none) -> +03:00", text)
+            self.assertIn("Dry Run Timezone Offset Preview", _strip_colors(text))
+            self.assertIn(
+                "IMG_2026.JPG 19-04-2026 10:38:13 DateTimeOriginal +03:00 Canon EOS M50",
+                _compact(_strip_colors(text)),
+            )
+            self.assertIn("\033[33m+03:00\033[0m", text)
 
     def test_timezone_fix_preview_orders_by_date_time_then_filename(self):
         with TemporaryDirectory() as temp_dir:
@@ -595,7 +617,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 "Leya-Skiing-2.jpg 05-01-2026 12:00:00 DateTimeOriginal +02:00 Canon EOS M50",
                 compact_text,
             )
-            self.assertIn(_green("Canon EOS M50"), text)
+            self.assertIn(_yellow("Canon EOS M50"), text)
 
     def test_manual_fix_can_update_one_file_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -638,7 +660,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 "Leya-Skiing-2.jpg 05-01-2026 12:00:00 DateTimeOriginal +03:00 UnknownDevice",
                 compact_text,
             )
-            self.assertIn(_green("+03:00"), output.getvalue())
+            self.assertIn(_yellow("+03:00"), output.getvalue())
 
     def test_manual_fix_can_update_one_file_date(self):
         with TemporaryDirectory() as temp_dir:
@@ -701,8 +723,8 @@ class FixAuditIssuesTests(unittest.TestCase):
                 compact_text,
             )
             text = output.getvalue()
-            self.assertIn(_green("06-02-2026"), text)
-            self.assertIn(_green("12:00:00"), text)
+            self.assertIn(_yellow("06-02-2026"), text)
+            self.assertIn(_yellow("12:00:00"), text)
 
     def test_manual_video_date_fix_preserves_existing_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -871,7 +893,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 "Leya-Skiing-2.jpg 05-01-2026 13:14:15 DateTimeOriginal +02:00 UnknownDevice",
                 _compact(_strip_colors(output.getvalue())),
             )
-            self.assertIn(_green("13:14:15"), output.getvalue())
+            self.assertIn(_yellow("13:14:15"), output.getvalue())
 
     def test_manual_fix_handles_duplicate_filenames_by_prompting_for_one_match(self):
         with TemporaryDirectory() as temp_dir:
@@ -1337,8 +1359,8 @@ def _compact(value: str) -> str:
     return re.sub(r"[ \t]+", " ", value)
 
 
-def _green(value: str) -> str:
-    return f"{GREEN}{value}{RESET}"
+def _yellow(value: str) -> str:
+    return f"{YELLOW}{value}{RESET}"
 
 
 if __name__ == "__main__":

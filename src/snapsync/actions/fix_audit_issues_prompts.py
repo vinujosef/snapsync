@@ -191,9 +191,9 @@ def run_manual_file_fix(
         if choice in {"2", "b"}:
             return _run_manual_time_fix(selected_path, metadata, settings)
         if choice in {"3", "c"}:
-            return _run_manual_offset_fix(selected_path, settings)
+            return _run_manual_offset_fix(selected_path, metadata, settings)
         if choice in {"4", "d"}:
-            return _run_manual_device_fix(selected_path, settings)
+            return _run_manual_device_fix(selected_path, metadata, settings)
     except Exception as exc:
         logger.error(f"Could not update metadata for {selected_path.name}: {exc}")
         return 1
@@ -950,7 +950,7 @@ def _run_manual_time_fix(path: Path, metadata: Metadata, settings: Settings) -> 
     return _write_manual_datetime_change(path, metadata, new_datetime, settings, "iv.", workflow_path)
 
 
-def _run_manual_offset_fix(path: Path, settings: Settings) -> int:
+def _run_manual_offset_fix(path: Path, metadata: Metadata, settings: Settings) -> int:
     workflow_path = (*EDIT_ONE_PATH, "Change timezone offset")
     offset = _step_input("iii.", "New offset (+HH:MM or -HH:MM)", path=workflow_path, step_count="3 of 4")
     if parse_timezone_offset_minutes(offset) is None:
@@ -964,11 +964,11 @@ def _run_manual_offset_fix(path: Path, settings: Settings) -> int:
     if not settings.dry_run:
         write_timezone_offset(path, offset, settings)
         verify_timezone_offset(path, offset, settings)
-    print(f"{_completion_label('Updated', settings)} {path.name}: offset -> {offset}")
+    _print_manual_metadata_result(path, replace(metadata, timezone_offset=offset), "Offset", settings)
     return 0
 
 
-def _run_manual_device_fix(path: Path, settings: Settings) -> int:
+def _run_manual_device_fix(path: Path, metadata: Metadata, settings: Settings) -> int:
     workflow_path = (*EDIT_ONE_PATH, "Change device name")
     device_choice = _choose_manual_device_name(workflow_path)
     if not device_choice:
@@ -985,7 +985,7 @@ def _run_manual_device_fix(path: Path, settings: Settings) -> int:
     if not settings.dry_run:
         write_device_model(path, device_choice.name, settings)
         verify_device_model(path, device_choice.name, settings)
-    print(f"{_completion_label('Set Model', settings)} {path.name}: {device_choice.name}")
+    _print_manual_metadata_result(path, replace(metadata, device_name=device_choice.name), "Device", settings)
     return 0
 
 
@@ -1008,8 +1008,26 @@ def _write_manual_datetime_change(
     if not settings.dry_run:
         write_datetime(path, new_datetime, metadata.timezone_offset, settings)
         verify_datetime(path, new_datetime, metadata.timezone_offset, settings)
-    print(f"{_completion_label('Updated', settings)} {path.name}: date/time")
+    _print_manual_metadata_result(path, replace(metadata, selected_datetime=new_datetime), "Date/Time", settings)
     return 0
+
+
+def _print_manual_metadata_result(
+    path: Path,
+    metadata: Metadata,
+    changed_field: str,
+    settings: Settings,
+) -> None:
+    if settings.dry_run:
+        print_section_heading("Dry Run Metadata Preview")
+        print("DRY RUN: no metadata was written.")
+    else:
+        print_section_heading("Updated Metadata")
+    _print_file_table(
+        ["Filename", "Date", "Time", "Taken From", "Offset", "Device", "Fingerprint"],
+        [_metadata_readback_row(path, metadata, changed_field)],
+        [format_display_date(metadata.selected_datetime)],
+    )
 
 
 def _parse_date(value: str) -> date:

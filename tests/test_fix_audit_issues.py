@@ -10,6 +10,7 @@ import unittest
 from config.settings import Settings
 from snapsync.actions.fix_audit_issues import run_audit_issue_fix
 from snapsync.metadata import Metadata
+from snapsync.util.console import GREEN, RESET
 
 
 class FixAuditIssuesTests(unittest.TestCase):
@@ -488,7 +489,12 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("iii.\033[0m Choose device value:", text)
             self.assertIn("iv.\033[0m Device name:", text)
             self.assertIn("v.\033[0m Type yes to write metadata:", text)
-            self.assertIn("Set Model Leya-Skiing-2.jpg: Canon EOS M50", text)
+            self.assertIn("Updated Metadata", text)
+            self.assertIn(
+                "Leya-Skiing-2.jpg 05-01-2026 12:00:00 DateTimeOriginal +02:00 Canon EOS M50",
+                compact_text,
+            )
+            self.assertIn(_green("Canon EOS M50"), text)
 
     def test_manual_fix_can_update_one_file_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -524,7 +530,14 @@ class FixAuditIssuesTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             run.assert_called_once()
-            self.assertIn("Updated Leya-Skiing-2.jpg: offset -> +03:00", output.getvalue())
+            compact_text = _compact(_strip_colors(output.getvalue()))
+            self.assertIn("Updated Metadata", output.getvalue())
+            self.assertIn("Filename Date Time Taken From Offset Device", compact_text)
+            self.assertIn(
+                "Leya-Skiing-2.jpg 05-01-2026 12:00:00 DateTimeOriginal +03:00 UnknownDevice",
+                compact_text,
+            )
+            self.assertIn(_green("+03:00"), output.getvalue())
 
     def test_manual_fix_can_update_one_file_date(self):
         with TemporaryDirectory() as temp_dir:
@@ -579,7 +592,16 @@ class FixAuditIssuesTests(unittest.TestCase):
                 "Will change Leya-Skiing-2.jpg: 05-01-2026 12:00:00 -> 06-02-2026 12:00:00",
                 output.getvalue(),
             )
-            self.assertIn("Updated Leya-Skiing-2.jpg: date/time", output.getvalue())
+            compact_text = _compact(_strip_colors(output.getvalue()))
+            self.assertIn("Updated Metadata", output.getvalue())
+            self.assertIn("Filename Date Time Taken From Offset Device", compact_text)
+            self.assertIn(
+                "Leya-Skiing-2.jpg 06-02-2026 12:00:00 DateTimeOriginal +02:00 UnknownDevice",
+                compact_text,
+            )
+            text = output.getvalue()
+            self.assertIn(_green("06-02-2026"), text)
+            self.assertIn(_green("12:00:00"), text)
 
     def test_manual_video_date_fix_preserves_existing_offset(self):
         with TemporaryDirectory() as temp_dir:
@@ -644,7 +666,11 @@ class FixAuditIssuesTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertIn("Updated 0871a475-a7c9-4090-bc6e-68c47ca1ff4f.MP4: date/time", output.getvalue())
+            self.assertIn("Updated Metadata", output.getvalue())
+            self.assertIn(
+                "0871a475-a7c9-4090-bc6e-68c47ca1ff4f.MP4 02-05-2026 12:15:45 CreateDate +03:00 UnknownDevice",
+                _compact(_strip_colors(output.getvalue())),
+            )
 
     def test_manual_video_date_fix_does_not_create_local_machine_offset_when_missing(self):
         with TemporaryDirectory() as temp_dir:
@@ -700,7 +726,11 @@ class FixAuditIssuesTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertIn("Updated 1911202200134_encoded.mp4: date/time", output.getvalue())
+            self.assertIn("Updated Metadata", output.getvalue())
+            self.assertIn(
+                "1911202200134_encoded.mp4 19-11-2022 02:00:34 FileModifyDate (none) UnknownDevice",
+                _compact(_strip_colors(output.getvalue())),
+            )
 
     def test_manual_fix_can_update_one_file_time(self):
         with TemporaryDirectory() as temp_dir:
@@ -735,7 +765,12 @@ class FixAuditIssuesTests(unittest.TestCase):
                 exit_code = run_audit_issue_fix(root, settings)
 
             self.assertEqual(exit_code, 0)
-            self.assertIn("Updated Leya-Skiing-2.jpg: date/time", output.getvalue())
+            self.assertIn("Updated Metadata", output.getvalue())
+            self.assertIn(
+                "Leya-Skiing-2.jpg 05-01-2026 13:14:15 DateTimeOriginal +02:00 UnknownDevice",
+                _compact(_strip_colors(output.getvalue())),
+            )
+            self.assertIn(_green("13:14:15"), output.getvalue())
 
     def test_manual_fix_handles_duplicate_filenames_by_prompting_for_one_match(self):
         with TemporaryDirectory() as temp_dir:
@@ -773,7 +808,12 @@ class FixAuditIssuesTests(unittest.TestCase):
             text = output.getvalue()
             self.assertIn("Multiple files found:", text)
             self.assertIn("2 two/same.jpg", _compact(_strip_colors(text)))
-            self.assertIn("Would set Model same.jpg: WhatsApp", text)
+            self.assertIn("Dry Run Metadata Preview", text)
+            self.assertIn("DRY RUN: no metadata was written.", text)
+            self.assertIn(
+                "same.jpg 05-01-2026 12:00:00 DateTimeOriginal +02:00 WhatsApp",
+                _compact(_strip_colors(text)),
+            )
 
     def test_manual_fix_rejects_invalid_date(self):
         with TemporaryDirectory() as temp_dir:
@@ -1192,6 +1232,10 @@ def _strip_colors(value: str) -> str:
 
 def _compact(value: str) -> str:
     return re.sub(r"[ \t]+", " ", value)
+
+
+def _green(value: str) -> str:
+    return f"{GREEN}{value}{RESET}"
 
 
 if __name__ == "__main__":

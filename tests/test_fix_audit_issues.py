@@ -1,4 +1,5 @@
 from contextlib import redirect_stdout
+from dataclasses import replace as replace_metadata
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -38,7 +39,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["1", "yes"]),
+                patch("builtins.input", side_effect=["1", "3", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -73,7 +74,11 @@ class FixAuditIssuesTests(unittest.TestCase):
             plain_text = _strip_colors(text)
             self.assertIn("snapsync > Fix audit issues", text)
             self.assertIn("1 Fix timezone mismatch or missing offset 1 file", _compact(plain_text))
-            self.assertIn("i.\033[0m Review timezone rules and preview:", text)
+            self.assertIn("i.\033[0m Choose timezone offset fix mode:", text)
+            self.assertIn("1. Set only files with offset (none) to Helsinki timezone for each file date", text)
+            self.assertIn("2. Set only files with offset (none) to a custom offset", text)
+            self.assertIn("3. Change all timezone audit matches to Helsinki timezone", text)
+            self.assertIn("ii.\033[0m Review timezone rules and preview:", text)
             self.assertIn("Rules", plain_text)
             self.assertIn("Timezone baseline  Europe/Helsinki", plain_text)
             self.assertIn(
@@ -88,7 +93,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 "IMG_2026.JPG 19-04-2026 10:38:13 Canon EOS M50 +02:00 +03:00 update offset",
                 _compact(_strip_colors(text)),
             )
-            self.assertIn("ii.\033[0m Type yes to write timezone metadata:", text)
+            self.assertIn("iii.\033[0m Type yes to write timezone metadata:", text)
             self.assertIn("Updated IMG_2026.JPG: +02:00 -> +03:00", text)
 
     def test_fixes_missing_video_timezone_with_creation_date_and_verifies_readback(self):
@@ -115,7 +120,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["1", "yes"]),
+                patch("builtins.input", side_effect=["1", "1", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -153,6 +158,97 @@ class FixAuditIssuesTests(unittest.TestCase):
             )
             self.assertIn("Updated clip.mp4: (none) -> +03:00", output.getvalue())
 
+    def test_timezone_fix_missing_only_leaves_existing_offsets_unchanged(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            missing = root / "missing.jpg"
+            existing = root / "india.jpg"
+            missing.write_bytes(b"missing")
+            existing.write_bytes(b"existing")
+            settings = _settings(root, dry_run=False)
+            output = StringIO()
+
+            metadata_by_path = {
+                missing: Metadata(
+                    selected_datetime=datetime(2026, 7, 13, 15, 58, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 13 Pro",
+                    quality="metadata",
+                    timezone_offset=None,
+                ),
+                existing: Metadata(
+                    selected_datetime=datetime(2026, 7, 13, 13, 24, 38),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 13 Pro",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["1", "1", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
+                patch(
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
+                    return_value=replace_metadata(metadata_by_path[missing], timezone_offset="+03:00"),
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            run.assert_called_once()
+            self.assertEqual(run.call_args.args[0][-1], str(missing))
+            text = output.getvalue()
+            self.assertIn("Updated missing.jpg: (none) -> +03:00", text)
+            self.assertNotIn("Updated india.jpg", text)
+
+    def test_timezone_fix_missing_only_can_use_custom_offset(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "missing.jpg"
+            photo.write_bytes(b"photo")
+            settings = _settings(root, dry_run=False)
+            output = StringIO()
+
+            metadata_by_path = {
+                photo: Metadata(
+                    selected_datetime=datetime(2026, 7, 13, 15, 58, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 13 Pro",
+                    quality="metadata",
+                    timezone_offset=None,
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["1", "2", "+05:30", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
+                patch(
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
+                    return_value=replace_metadata(metadata_by_path[photo], timezone_offset="+05:30"),
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("-OffsetTimeOriginal=+05:30", run.call_args.args[0])
+            text = output.getvalue()
+            self.assertIn("iii.\033[0m Review timezone rules and preview:", text)
+            self.assertIn("iv.\033[0m Type yes to write timezone metadata:", text)
+            self.assertIn("Updated missing.jpg: (none) -> +05:30", text)
+
     def test_reports_error_when_timezone_write_does_not_read_back(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -177,7 +273,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["1", "yes"]),
+                patch("builtins.input", side_effect=["1", "3", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run"),
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -216,7 +312,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["1", "yes"]),
+                patch("builtins.input", side_effect=["1", "1", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
@@ -250,7 +346,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["1", "yes"]),
+                patch("builtins.input", side_effect=["1", "3", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
@@ -286,7 +382,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["1", "yes"]),
+                patch("builtins.input", side_effect=["1", "3", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run"),
                 redirect_stdout(output),
             ):

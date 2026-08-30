@@ -43,6 +43,15 @@ class DeviceChoice:
     used_custom_name: bool
 
 
+@dataclass(frozen=True)
+class TimezoneFixSelection:
+    fixes: list[TimezoneFix]
+    preview_marker: str = "ii."
+    preview_step_count: str = "2 of 3"
+    confirmation_marker: str = "iii."
+    confirmation_step_count: str = "3 of 3"
+
+
 ROOT_PATH = ("snapsync",)
 FIX_AUDIT_PATH = (*ROOT_PATH, "Fix audit issues")
 REPAIR_ALL_PATH = (*FIX_AUDIT_PATH, "Repair all scanned files")
@@ -76,14 +85,28 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count:
 def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int:
     path = (*FIX_AUDIT_PATH, "Fix timezone mismatch")
     _print_workflow_header(path)
-    print_section_heading("Timezone Offset Fix Preview", icon=ICONS["fix"])
+    print_section_heading("Timezone Offset Fix", icon=ICONS["fix"])
     _print_dry_run_notice(settings)
     if not fixes:
         print("No timezone offsets need fixing.")
         return 0
 
-    _print_step("i.", "Review timezone rules and preview", path=path, step_count="1 of 2")
-    _print_timezone_rules(fixes)
+    selection = _choose_timezone_offset_fixes(fixes, path)
+    if selection is None:
+        logger.info("No timezone offset fix mode selected")
+        return 0
+    selected_fixes = selection.fixes
+    if not selected_fixes:
+        print("No files matched that timezone offset fix mode.")
+        return 0
+
+    _print_step(
+        selection.preview_marker,
+        "Review timezone rules and preview",
+        path=path,
+        step_count=selection.preview_step_count,
+    )
+    _print_timezone_rules(selected_fixes)
     print()
     rows = [
         [
@@ -96,21 +119,26 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
             _action_label("update offset", settings),
             file_fingerprint(fix.path, _metadata_from_timezone_fix(fix)),
         ]
-        for fix in fixes
+        for fix in selected_fixes
     ]
     headers = ["Filename", "Date", "Time", "Device", "Current Offset", "New Offset", "Action", "Fingerprint"]
     _print_file_table(
         headers,
         _color_preview_rows(headers, rows),
-        [format_display_date(fix.selected_datetime) for fix in fixes],
+        [format_display_date(fix.selected_datetime) for fix in selected_fixes],
     )
     print()
-    if not _confirm_step("ii.", "Type yes to write timezone metadata", path=path, step_count="2 of 2"):
+    if not _confirm_step(
+        selection.confirmation_marker,
+        "Type yes to write timezone metadata",
+        path=path,
+        step_count=selection.confirmation_step_count,
+    ):
         logger.warning("Timezone offset fix was not confirmed; no files were changed")
         return 0
 
     errors = 0
-    for fix in fixes:
+    for fix in selected_fixes:
         try:
             if not settings.dry_run:
                 write_timezone_offset(fix.path, fix.expected_offset, settings)
@@ -124,6 +152,47 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
             logger.error(f"Could not update timezone for {fix.path.name}: {exc}")
 
     return 0 if errors == 0 else 1
+
+
+def _choose_timezone_offset_fixes(
+    fixes: list[TimezoneFix],
+    path: tuple[str, ...],
+) -> TimezoneFixSelection | None:
+    _print_step("i.", "Choose timezone offset fix mode", path=path, step_count="1 of 3")
+    print("1. Set only files with offset (none) to Helsinki timezone for each file date")
+    print("2. Set only files with offset (none) to a custom offset")
+    print("3. Change all timezone audit matches to Helsinki timezone")
+    print()
+    print("b. Back")
+    print("q. Quit")
+    print()
+
+    choice = input("> ").strip().lower()
+    if choice == "1":
+        return TimezoneFixSelection(_missing_offset_fixes(fixes))
+    if choice == "2":
+        custom_offset = _step_input(
+            "ii.",
+            "Custom offset for files with offset (none) (+HH:MM or -HH:MM)",
+            path=path,
+            step_count="2 of 4",
+        )
+        if parse_timezone_offset_minutes(custom_offset) is None:
+            raise ValueError("custom offset must use +HH:MM or -HH:MM")
+        return TimezoneFixSelection(
+            [replace(fix, expected_offset=custom_offset) for fix in _missing_offset_fixes(fixes)],
+            preview_marker="iii.",
+            preview_step_count="3 of 4",
+            confirmation_marker="iv.",
+            confirmation_step_count="4 of 4",
+        )
+    if choice == "3":
+        return TimezoneFixSelection(fixes)
+    return None
+
+
+def _missing_offset_fixes(fixes: list[TimezoneFix]) -> list[TimezoneFix]:
+    return [fix for fix in fixes if fix.current_offset == "(none)"]
 
 
 def run_unknown_device_fix(files: list[DeviceFix], settings: Settings) -> int:

@@ -868,7 +868,8 @@ def _print_timezone_rules(fixes: list[TimezoneFix]) -> None:
     print_section_heading("Rules")
     print_key_values([("Timezone baseline", "Europe/Helsinki")])
     for year in sorted({fix.selected_datetime.year for fix in fixes}):
-        print(cyan(helsinki_rule_line(year)))
+        label, separator, detail = helsinki_rule_line(year).partition(": ")
+        print(f"{muted(label + separator)}{detail}")
     print_key_values([("Timestamp priority", " > ".join(TIMESTAMP_FIELDS))])
 
 

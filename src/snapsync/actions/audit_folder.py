@@ -21,6 +21,7 @@ from snapsync.util.console import (
     ICONS,
     cyan,
     format_display_date,
+    muted,
     print_key_values,
     print_grouped_table,
     print_section_heading,
@@ -125,7 +126,9 @@ def _timezone_reference_offsets(metadata_by_path: dict[Path, Metadata]) -> set[s
 
 def _print_info_section(file_count: int) -> None:
     print_section_heading("Info", icon=ICONS["info"])
+    print()
     print_key_values([("Files", file_count)])
+    print()
     print(cyan("Legend"))
     print(warning(f"{ICONS['warning']} yellow = review timestamp source"))
     print(danger(f"{ICONS['warning']} red = needs review"))
@@ -135,7 +138,8 @@ def _print_rules_section(metadata_by_path: dict[Path, Metadata]) -> None:
     print_section_heading("Rules")
     print_key_values([("Timezone baseline", "Europe/Helsinki")])
     for year in metadata_years(metadata_by_path):
-        print(cyan(helsinki_rule_line(year)))
+        label, separator, detail = helsinki_rule_line(year).partition(": ")
+        print(f"{muted(label + separator)}{detail}")
     print_key_values([("Timestamp priority", " > ".join(TIMESTAMP_FIELDS))])
 
 

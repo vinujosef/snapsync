@@ -55,10 +55,14 @@ class AuditFolderTests(unittest.TestCase):
             self.assertIn("ℹ️ Info", plain_text)
             self.assertIn("Files  2", plain_text)
             self.assertIn("Legend", plain_text)
+            self.assertRegex(plain_text, r"ℹ️ Info\n\nFiles\s+2\n\nLegend")
             self.assertIn("red = needs review", plain_text)
             self.assertIn("Rules", plain_text)
             self.assertIn("Timezone baseline  Europe/Helsinki", plain_text)
-            self.assertIn("\033[36mHelsinki 2026: +03:00 from 29-03-2026, +02:00 from 25-10-2026\033[0m", text)
+            self.assertIn(
+                "\033[90mHelsinki 2026: \033[0m+03:00 from 29-03-2026, +02:00 from 25-10-2026",
+                text,
+            )
             self.assertIn(
                 "Timestamp priority  DateTimeOriginal > CreateDate > MediaCreateDate > "
                 "TrackCreateDate > FileModifyDate > FileCreateDate",

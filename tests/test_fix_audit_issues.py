@@ -76,7 +76,10 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("i.\033[0m Review timezone rules and preview:", text)
             self.assertIn("Rules", plain_text)
             self.assertIn("Timezone baseline  Europe/Helsinki", plain_text)
-            self.assertIn("Helsinki 2026: +03:00 from 29-03-2026, +02:00 from 25-10-2026", text)
+            self.assertIn(
+                "\033[90mHelsinki 2026: \033[0m+03:00 from 29-03-2026, +02:00 from 25-10-2026",
+                text,
+            )
             self.assertIn(
                 "Timestamp priority  DateTimeOriginal > CreateDate > MediaCreateDate > TrackCreateDate > FileModifyDate > FileCreateDate",
                 plain_text,

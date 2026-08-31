@@ -56,7 +56,7 @@ class TimezoneFixSelection:
 ROOT_PATH = ("snapsync",)
 FIX_AUDIT_PATH = (*ROOT_PATH, "Fix audit issues")
 REPAIR_ALL_PATH = (*FIX_AUDIT_PATH, "Repair all scanned files")
-REPAIR_MATCHING_PATH = (*FIX_AUDIT_PATH, "Repair matching files")
+REPAIR_MATCHING_PATH = (*FIX_AUDIT_PATH, "Repair matching audit issues")
 EDIT_ONE_PATH = (*FIX_AUDIT_PATH, "Edit one file")
 
 
@@ -66,11 +66,11 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count:
     _print_table(
         ["Option", "Repair", "Files"],
         [
-            ["1", "Fix timezone mismatch or missing offset", _files_label(timezone_count)],
-            ["2", "Set unknown device name", _files_label(unknown_device_count)],
-            ["3", "Edit metadata for one file", "-"],
-            ["4", "Repair all scanned files", _files_label(bulk_count)],
-            ["5", "Repair matching files", _files_label(bulk_count)],
+            ["1", "Repair all scanned files", _files_label(bulk_count)],
+            ["2", "Repair matching audit issues", _files_label(bulk_count)],
+            ["3", "Fix timezone mismatch or missing offset", _files_label(timezone_count)],
+            ["4", "Set unknown device name", _files_label(unknown_device_count)],
+            ["5", "Edit metadata for one file", "-"],
         ],
     )
     print()

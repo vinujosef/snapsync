@@ -168,6 +168,130 @@ class FixAuditIssuesTests(unittest.TestCase):
                 _compact(_strip_colors(output.getvalue())),
             )
 
+    def test_fixes_finder_created_date_after_confirmation(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "finder-wrong.jpg"
+            photo.write_bytes(b"photo")
+            settings = _settings(root, dry_run=False)
+            output = StringIO()
+
+            metadata_by_path = {
+                photo: Metadata(
+                    selected_datetime=datetime(2026, 8, 26, 11, 33, 3),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="Canon EOS 700D",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                    file_create_datetime=datetime(2026, 7, 26, 11, 33, 4),
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["5", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
+                patch(
+                    "snapsync.actions.fix_audit_issues_writer.extract_metadata",
+                    return_value=replace_metadata(
+                        metadata_by_path[photo],
+                        file_create_datetime=datetime(2026, 8, 26, 11, 33, 3),
+                    ),
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            run.assert_called_once_with(
+                [
+                    "exiftool",
+                    "-overwrite_original",
+                    "-P",
+                    "-FileCreateDate=2026:08:26 11:33:03",
+                    str(photo),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            text = output.getvalue()
+            compact_text = _compact(_strip_colors(text))
+            self.assertIn("5 Fix Finder created date 1 file", compact_text)
+            self.assertIn("Finder Created Date Fix", text)
+            self.assertIn(
+                "finder-wrong.jpg 26-08-2026 11:33:03 DateTimeOriginal 26-07-2026 11:33:04 26-08-2026 11:33:03",
+                compact_text,
+            )
+            self.assertIn("Updated Finder Created Dates", text)
+            self.assertIn(
+                "finder-wrong.jpg 26-08-2026 11:33:03 DateTimeOriginal 26-08-2026 11:33:03 +05:30 Canon EOS 700D",
+                compact_text,
+            )
+
+    def test_finder_created_date_fix_ignores_matching_and_missing_file_create_dates(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            wrong = root / "wrong.jpg"
+            right = root / "right.jpg"
+            missing = root / "missing.jpg"
+            for path in (wrong, right, missing):
+                path.write_bytes(b"photo")
+            settings = _settings(root, dry_run=True)
+            output = StringIO()
+
+            metadata_by_path = {
+                wrong: Metadata(
+                    selected_datetime=datetime(2026, 8, 26, 11, 33, 3),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="Canon EOS 700D",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                    file_create_datetime=datetime(2026, 7, 26, 11, 33, 4),
+                ),
+                right: Metadata(
+                    selected_datetime=datetime(2026, 8, 26, 11, 33, 4),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="Canon EOS 700D",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                    file_create_datetime=datetime(2026, 8, 26, 11, 33, 4),
+                ),
+                missing: Metadata(
+                    selected_datetime=datetime(2026, 8, 26, 11, 33, 5),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="Canon EOS 700D",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                    file_create_datetime=None,
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["5", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_prompts.write_file_create_date") as write_file_create_date,
+                redirect_stdout(output),
+            ):
+                exit_code = run_audit_issue_fix(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            write_file_create_date.assert_not_called()
+            text = output.getvalue()
+            compact_text = _compact(_strip_colors(text))
+            self.assertIn("5 Fix Finder created date 1 file", compact_text)
+            self.assertIn("wrong.jpg", text)
+            self.assertNotIn("right.jpg", text)
+            self.assertNotIn("missing.jpg", text)
+
     def test_timezone_fix_missing_only_leaves_existing_offsets_unchanged(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -471,6 +595,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("i.\033[0m Review file:", text)
             compact_text = _compact(plain_text)
             self.assertIn("File Date Time Taken From Offset Current Device", compact_text)
+            self.assertIn("(Capture Date Time)", compact_text)
             self.assertIn("first.jpg 05-01-2026 12:00:00 DateTimeOriginal +02:00 UnknownDevice", compact_text)
             self.assertIn("ii.\033[0m Choose device value:", text)
             self.assertIn("iii.\033[0m Device name:", text)
@@ -573,7 +698,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["5", "Leya-Skiing-2.jpg", "d", "b", "Canon EOS M50", "yes"]),
+                patch("builtins.input", side_effect=["6", "Leya-Skiing-2.jpg", "d", "b", "Canon EOS M50", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -607,6 +732,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             self.assertIn("i.\033[0m Enter filename:", text)
             compact_text = _compact(plain_text)
             self.assertIn("File Date Time Taken From Offset Device", compact_text)
+            self.assertIn("(Capture Date Time)", compact_text)
             self.assertIn("Leya-Skiing-2.jpg 05-01-2026 12:00:00 DateTimeOriginal +02:00 UnknownDevice", compact_text)
             self.assertIn("ii.\033[0m Choose what to change:", text)
             self.assertIn("iii.\033[0m Choose device value:", text)
@@ -635,7 +761,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["5", "Leya-Skiing-2.jpg", "c", "+03:00", "yes"]),
+                patch("builtins.input", side_effect=["6", "Leya-Skiing-2.jpg", "c", "+03:00", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -656,6 +782,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             compact_text = _compact(_strip_colors(output.getvalue()))
             self.assertIn("Updated Metadata", output.getvalue())
             self.assertIn("Filename Date Time Taken From Offset Device", compact_text)
+            self.assertIn("(Capture Date Time)", compact_text)
             self.assertIn(
                 "Leya-Skiing-2.jpg 05-01-2026 12:00:00 DateTimeOriginal +03:00 UnknownDevice",
                 compact_text,
@@ -678,7 +805,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["5", "Leya-Skiing-2.jpg", "a", "06-02-2026", "yes"]),
+                patch("builtins.input", side_effect=["6", "Leya-Skiing-2.jpg", "a", "06-02-2026", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -718,6 +845,7 @@ class FixAuditIssuesTests(unittest.TestCase):
             compact_text = _compact(_strip_colors(output.getvalue()))
             self.assertIn("Updated Metadata", output.getvalue())
             self.assertIn("Filename Date Time Taken From Offset Device", compact_text)
+            self.assertIn("(Capture Date Time)", compact_text)
             self.assertIn(
                 "Leya-Skiing-2.jpg 06-02-2026 12:00:00 DateTimeOriginal +02:00 UnknownDevice",
                 compact_text,
@@ -753,7 +881,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                 patch("sys.stdin.isatty", return_value=True),
                 patch(
                     "builtins.input",
-                    side_effect=["5", "0871a475-a7c9-4090-bc6e-68c47ca1ff4f.MP4", "a", "02-05-2026", "yes"],
+                    side_effect=["6", "0871a475-a7c9-4090-bc6e-68c47ca1ff4f.MP4", "a", "02-05-2026", "yes"],
                 ),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
@@ -819,7 +947,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["5", "1911202200134_encoded.mp4", "a", "19-11-2022", "yes"]),
+                patch("builtins.input", side_effect=["6", "1911202200134_encoded.mp4", "a", "19-11-2022", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -871,7 +999,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["5", "Leya-Skiing-2.jpg", "b", "13:14:15", "yes"]),
+                patch("builtins.input", side_effect=["6", "Leya-Skiing-2.jpg", "b", "13:14:15", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run"),
                 patch(
                     "snapsync.actions.fix_audit_issues_writer.extract_metadata",
@@ -920,7 +1048,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["5", "same.jpg", "2", "d", "a", "yes"]),
+                patch("builtins.input", side_effect=["6", "same.jpg", "2", "d", "a", "yes"]),
                 patch("snapsync.actions.fix_audit_issues_writer.subprocess.run") as run,
                 redirect_stdout(output),
             ):
@@ -954,7 +1082,7 @@ class FixAuditIssuesTests(unittest.TestCase):
                     return_value=metadata_by_path,
                 ),
                 patch("sys.stdin.isatty", return_value=True),
-                patch("builtins.input", side_effect=["5", "Leya-Skiing-2.jpg", "a", "not-a-date"]),
+                patch("builtins.input", side_effect=["6", "Leya-Skiing-2.jpg", "a", "not-a-date"]),
                 patch("snapsync.actions.fix_audit_issues_prompts.logger.error") as error,
                 redirect_stdout(output),
             ):

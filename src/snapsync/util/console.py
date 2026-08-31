@@ -190,7 +190,7 @@ def print_table(headers: list[str], rows: list[list[str]]) -> None:
         _print_rich_table(headers, rows)
         return
     widths = table_widths(headers, rows)
-    _emit(format_table_row(headers, widths, header=True))
+    _emit_header(headers, widths)
     _emit(format_table_separator(widths))
     for row in rows:
         _emit(format_table_row(row, widths))
@@ -201,9 +201,9 @@ def print_grouped_table(headers: list[str], rows: list[list[str]], group_values:
         _print_rich_table(headers, rows, group_values=group_values)
         return
     widths = table_widths(headers, rows)
-    _emit(format_table_row(headers, widths, header=True))
+    _emit_header(headers, widths)
     _emit(format_table_separator(widths))
-    row_width = visible_len(format_table_row(headers, widths))
+    row_width = visible_len(format_table_separator(widths))
     previous_group: str | None = None
     for index, row in enumerate(rows):
         current_group = group_values[index]
@@ -243,8 +243,28 @@ def _print_rich_table(
 
 def table_widths(headers: list[str], rows: list[list[str]]) -> list[int]:
     return [
-        max(visible_len(row[index]) for row in [headers, *rows])
+        max(cell_visible_width(row[index]) for row in [headers, *rows])
         for index in range(len(headers))
+    ]
+
+
+def _emit_header(headers: list[str], widths: list[int]) -> None:
+    for line in format_table_header(headers, widths):
+        _emit(line)
+
+
+def format_table_header(headers: list[str], widths: list[int]) -> list[str]:
+    header_lines = [cell_lines(header) for header in headers]
+    max_lines = max((len(lines) for lines in header_lines), default=0)
+    return [
+        heading(
+            "  ".join(
+                pad_cell(header_lines[index][line_index] if line_index < len(header_lines[index]) else "", widths[index])
+                for index in range(len(headers))
+            ),
+            bold=True,
+        )
+        for line_index in range(max_lines)
     ]
 
 
@@ -261,6 +281,14 @@ def format_table_separator(widths: list[int]) -> str:
 
 def pad_cell(value: str, width: int) -> str:
     return value + (" " * (width - visible_len(value)))
+
+
+def cell_lines(value: str) -> list[str]:
+    return value.splitlines() or [""]
+
+
+def cell_visible_width(value: str) -> int:
+    return max(visible_len(line) for line in cell_lines(value))
 
 
 def visible_len(value: str) -> int:

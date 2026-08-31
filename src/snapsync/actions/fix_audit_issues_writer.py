@@ -62,6 +62,17 @@ def verify_device_model(path: Path, device_name: str, settings: Settings) -> Non
         raise ValueError(f"metadata still reports {metadata.device_name}")
 
 
+def verify_file_create_date(path: Path, expected_datetime: datetime, settings: Settings) -> None:
+    metadata = extract_metadata(path, settings.exiftool_path)
+    if metadata.file_create_datetime != expected_datetime:
+        actual = (
+            format_display_datetime(metadata.file_create_datetime)
+            if metadata.file_create_datetime
+            else "(none)"
+        )
+        raise ValueError(f"file created date still reports {actual}")
+
+
 def write_datetime(
     path: Path,
     selected_datetime: datetime,
@@ -90,6 +101,22 @@ def write_datetime(
 
     subprocess.run(
         command,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def write_file_create_date(path: Path, selected_datetime: datetime, settings: Settings) -> None:
+    timestamp = selected_datetime.strftime("%Y:%m:%d %H:%M:%S")
+    subprocess.run(
+        [
+            settings.exiftool_path,
+            "-overwrite_original",
+            "-P",
+            f"-FileCreateDate={timestamp}",
+            str(path),
+        ],
         check=True,
         capture_output=True,
         text=True,

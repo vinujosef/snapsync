@@ -115,7 +115,7 @@ def _file_create_date_cell(metadata: Metadata) -> str:
     value = metadata.file_create_datetime.strftime("%d-%m-%Y %H:%M:%S")
     if file_create_date_has_warning(metadata):
         return danger(value)
-    return value
+    return muted(value)
 
 
 def _device_cell(metadata: Metadata) -> str:
@@ -192,10 +192,10 @@ def _print_issues_section(
 def _print_table(rows: list[list[str]], group_values: list[str]) -> None:
     headers = [
         "Filename",
-        "Date",
-        "Time",
+        "Date\n(Capture Date Time)",
+        "Time\n(Capture Date Time)",
         "Taken From",
-        "File Created",
+        "Date Time\n(FileCreateDate / macOS Finder)",
         "Offset",
         "Device",
         "Fingerprint",

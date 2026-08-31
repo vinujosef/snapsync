@@ -7,13 +7,15 @@ from pathlib import Path
 from typing import Callable
 
 from config.settings import Settings
-from snapsync.actions.fix_audit_issues_finder import DeviceFix, TimezoneFix
+from snapsync.actions.fix_audit_issues_finder import DeviceFix, FileCreateDateFix, TimezoneFix
 from snapsync.actions.fix_audit_issues_writer import (
     verify_datetime,
     verify_device_model,
+    verify_file_create_date,
     verify_timezone_offset,
     write_datetime,
     write_device_model,
+    write_file_create_date,
     write_timezone_offset,
 )
 from snapsync.file_fingerprint import file_fingerprint
@@ -60,7 +62,12 @@ REPAIR_MATCHING_PATH = (*FIX_AUDIT_PATH, "Repair matching audit issues")
 EDIT_ONE_PATH = (*FIX_AUDIT_PATH, "Edit one file")
 
 
-def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count: int) -> None:
+def print_issue_menu(
+    timezone_count: int,
+    unknown_device_count: int,
+    file_create_date_count: int,
+    bulk_count: int,
+) -> None:
     _print_workflow_header(FIX_AUDIT_PATH)
     print_section_heading("Available Repairs", icon=ICONS["fix"])
     _print_table(
@@ -70,7 +77,8 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count:
             ["2", "Repair matching audit issues", _files_label(bulk_count)],
             ["3", "Fix timezone mismatch or missing offset", _files_label(timezone_count)],
             ["4", "Set unknown device name", _files_label(unknown_device_count)],
-            ["5", "Edit metadata for one file", "-"],
+            ["5", "Fix Finder created date", _files_label(file_create_date_count)],
+            ["6", "Edit metadata for one file", "-"],
         ],
     )
     print()
@@ -78,6 +86,8 @@ def print_issue_menu(timezone_count: int, unknown_device_count: int, bulk_count:
         print("No timezone mismatch or missing offset issues found.")
     if unknown_device_count == 0:
         print("No unknown device name issues found.")
+    if file_create_date_count == 0:
+        print("No Finder created date issues found.")
     print("q. Back")
     print()
     print("Choose repair:")
@@ -122,7 +132,16 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
         ]
         for fix in selected_fixes
     ]
-    headers = ["Filename", "Date", "Time", "Device", "Current Offset", "New Offset", "Action", "Fingerprint"]
+    headers = [
+        "Filename",
+        "Date\n(Capture Date Time)",
+        "Time\n(Capture Date Time)",
+        "Device",
+        "Current Offset",
+        "New Offset",
+        "Action",
+        "Fingerprint",
+    ]
     _print_file_table(
         headers,
         _color_preview_rows(headers, rows),
@@ -206,7 +225,15 @@ def _print_timezone_fix_result(fixes: list[TimezoneFix], settings: Settings) -> 
         print("No timezone offsets were updated.")
         return
 
-    headers = ["Filename", "Date", "Time", "Taken From", "Offset", "Device", "Fingerprint"]
+    headers = [
+        "Filename",
+        "Date\n(Capture Date Time)",
+        "Time\n(Capture Date Time)",
+        "Taken From",
+        "Offset",
+        "Device",
+        "Fingerprint",
+    ]
     rows = [
         [
             fix.path.name,
@@ -253,6 +280,110 @@ def run_unknown_device_fix(files: list[DeviceFix], settings: Settings) -> int:
             logger.error(f"Could not update device for {fix.path.name}: {exc}")
 
     return 0 if errors == 0 else 1
+
+
+def run_file_create_date_fix(fixes: list[FileCreateDateFix], settings: Settings) -> int:
+    path = (*FIX_AUDIT_PATH, "Fix Finder created date")
+    _print_workflow_header(path)
+    print_section_heading("Finder Created Date Fix", icon=ICONS["fix"])
+    _print_dry_run_notice(settings)
+    if not fixes:
+        print("No Finder created dates need fixing.")
+        return 0
+
+    _print_step("i.", "Review Finder created date changes", path=path, step_count="1 of 2")
+    rows = [
+        [
+            fix.path.name,
+            format_display_date(fix.selected_datetime),
+            fix.selected_datetime.strftime("%H:%M:%S"),
+            fix.timestamp_field,
+            format_display_datetime(fix.current_file_create_datetime),
+            format_display_datetime(fix.selected_datetime),
+            fix.timezone_offset or "(none)",
+            fix.device_name,
+            file_fingerprint(fix.path, _metadata_from_file_create_date_fix(fix)),
+        ]
+        for fix in fixes
+    ]
+    headers = [
+        "Filename",
+        "Date\n(Capture Date Time)",
+        "Time\n(Capture Date Time)",
+        "Taken From",
+        "Current Date Time\n(FileCreateDate / macOS Finder)",
+        "New Date Time\n(FileCreateDate / macOS Finder)",
+        "Offset",
+        "Device",
+        "Fingerprint",
+    ]
+    _print_file_table(
+        headers,
+        _color_preview_rows(headers, rows),
+        [format_display_date(fix.selected_datetime) for fix in fixes],
+    )
+    print()
+    if not _confirm_step("ii.", _metadata_confirmation_prompt(settings), path=path, step_count="2 of 2"):
+        logger.warning("Finder created date fix was not confirmed; no files were changed")
+        return 0
+
+    errors = 0
+    updated_fixes: list[FileCreateDateFix] = []
+    for fix in fixes:
+        try:
+            if not settings.dry_run:
+                write_file_create_date(fix.path, fix.selected_datetime, settings)
+                verify_file_create_date(fix.path, fix.selected_datetime, settings)
+            updated_fixes.append(fix)
+        except Exception as exc:
+            errors += 1
+            logger.error(f"Could not update Finder created date for {fix.path.name}: {exc}")
+
+    _print_file_create_date_fix_result(updated_fixes, settings)
+    return 0 if errors == 0 else 1
+
+
+def _print_file_create_date_fix_result(fixes: list[FileCreateDateFix], settings: Settings) -> None:
+    if settings.dry_run:
+        print_section_heading("Dry Run Finder Created Date Preview")
+        print("DRY RUN: no metadata was written.")
+    else:
+        print_section_heading("Updated Finder Created Dates")
+
+    if not fixes:
+        print("No Finder created dates were updated.")
+        return
+
+    headers = [
+        "Filename",
+        "Date\n(Capture Date Time)",
+        "Time\n(Capture Date Time)",
+        "Taken From",
+        "Date Time\n(FileCreateDate / macOS Finder)",
+        "Offset",
+        "Device",
+        "Fingerprint",
+    ]
+    rows = [
+        [
+            fix.path.name,
+            format_display_date(fix.selected_datetime),
+            fix.selected_datetime.strftime("%H:%M:%S"),
+            fix.timestamp_field,
+            yellow(format_display_datetime(fix.selected_datetime)),
+            fix.timezone_offset or "(none)",
+            fix.device_name,
+            file_fingerprint(
+                fix.path,
+                replace(
+                    _metadata_from_file_create_date_fix(fix),
+                    file_create_datetime=fix.selected_datetime,
+                ),
+            ),
+        ]
+        for fix in fixes
+    ]
+    _print_file_table(headers, rows, [format_display_date(fix.selected_datetime) for fix in fixes])
 
 
 def run_manual_file_fix(
@@ -826,7 +957,15 @@ def _write_bulk_changes(
 
     if final_rows:
         _print_file_table(
-            ["Filename", "Date", "Time", "Taken From", "Offset", "Device", "Fingerprint"],
+            [
+                "Filename",
+                "Date\n(Capture Date Time)",
+                "Time\n(Capture Date Time)",
+                "Taken From",
+                "Offset",
+                "Device",
+                "Fingerprint",
+            ],
             final_rows,
             [format_display_date(planned_metadata_by_path[path].selected_datetime) for path in changed_paths],
         )
@@ -975,7 +1114,15 @@ def _print_timezone_rules(fixes: list[TimezoneFix]) -> None:
 
 def _print_device_fix_metadata(fix: DeviceFix) -> None:
     _print_table(
-        ["File", "Date", "Time", "Taken From", "Offset", "Current Device", "Fingerprint"],
+        [
+            "File",
+            "Date\n(Capture Date Time)",
+            "Time\n(Capture Date Time)",
+            "Taken From",
+            "Offset",
+            "Current Device",
+            "Fingerprint",
+        ],
         [
             [
                 fix.path.name,
@@ -1020,7 +1167,15 @@ def _print_current_metadata(path: Path, metadata: Metadata) -> None:
     taken_at = metadata.selected_datetime
     print()
     _print_table(
-        ["File", "Date", "Time", "Taken From", "Offset", "Device", "Fingerprint"],
+        [
+            "File",
+            "Date\n(Capture Date Time)",
+            "Time\n(Capture Date Time)",
+            "Taken From",
+            "Offset",
+            "Device",
+            "Fingerprint",
+        ],
         [
             [
                 path.name,
@@ -1125,7 +1280,15 @@ def _print_manual_metadata_result(
     else:
         print_section_heading("Updated Metadata")
     _print_file_table(
-        ["Filename", "Date", "Time", "Taken From", "Offset", "Device", "Fingerprint"],
+        [
+            "Filename",
+            "Date\n(Capture Date Time)",
+            "Time\n(Capture Date Time)",
+            "Taken From",
+            "Offset",
+            "Device",
+            "Fingerprint",
+        ],
         [_metadata_readback_row(path, metadata, changed_field)],
         [format_display_date(metadata.selected_datetime)],
     )
@@ -1298,4 +1461,17 @@ def _metadata_from_device_fix(fix: DeviceFix) -> Metadata:
         timezone_offset=fix.timezone_offset,
         image_width=fix.image_width,
         image_height=fix.image_height,
+    )
+
+
+def _metadata_from_file_create_date_fix(fix: FileCreateDateFix) -> Metadata:
+    return Metadata(
+        selected_datetime=fix.selected_datetime,
+        timestamp_field=fix.timestamp_field,
+        device_name=fix.device_name,
+        quality="metadata",
+        timezone_offset=fix.timezone_offset,
+        image_width=fix.image_width,
+        image_height=fix.image_height,
+        file_create_datetime=fix.current_file_create_datetime,
     )

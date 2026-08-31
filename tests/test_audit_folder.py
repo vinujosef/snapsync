@@ -70,11 +70,14 @@ class AuditFolderTests(unittest.TestCase):
             )
             self.assertIn("🔍 Audit Details", plain_text)
             compact_text = _compact(plain_text)
-            self.assertIn("Filename Date Time Taken From File Created", compact_text)
+            self.assertIn("Filename Date Time Taken From Date Time", compact_text)
+            self.assertIn("(Capture Date Time)", compact_text)
+            self.assertIn("(FileCreateDate / macOS Finder)", compact_text)
             self.assertIn(
                 "IMG_0001.JPG 18-05-2026 14:22:11 DateTimeOriginal (none) +03:00 iPhone 16 Pro 5 B res? 14:22:11",
                 compact_text,
             )
+            self.assertIn("\033[90m5 B res? 14:22:11\033[0m", text)
             self.assertIn("⚠️ clip.mov 19-05-2026 09:01:02 MediaCreateDate", compact_text)
             self.assertIn("⚠️ Issues", plain_text)
             self.assertIn("Timezone mismatch/missing       1", plain_text)
@@ -490,6 +493,40 @@ class AuditFolderTests(unittest.TestCase):
             self.assertIn("\033[31m26-07-2026\033[0m", text)
             self.assertIn("\033[31m11:28:00\033[0m", text)
             self.assertIn("\033[31m01-08-2026 09:10:11\033[0m", text)
+
+    def test_marks_matching_file_created_date_muted(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "finder-right.jpg"
+            photo.write_bytes(b"photo")
+            settings = _settings(root)
+            output = StringIO()
+
+            metadata_by_path = {
+                photo: Metadata(
+                    selected_datetime=datetime(2026, 8, 26, 11, 28, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+03:00",
+                    file_create_datetime=datetime(2026, 8, 26, 11, 28, 0),
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.audit_folder.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_folder_audit(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            text = output.getvalue()
+            self.assertIn("File created date differs       0", _strip_colors(text))
+            self.assertIn("\033[90m26-08-2026 11:28:00\033[0m", text)
+            self.assertNotIn("\033[31m26-08-2026 11:28:00\033[0m", text)
 
     def test_marks_missing_timezone_red(self):
         with TemporaryDirectory() as temp_dir:

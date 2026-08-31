@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from snapsync.metadata import Metadata
-from snapsync.metadata_audit import expected_helsinki_offset, metadata_warnings
+from snapsync.metadata_audit import expected_helsinki_offset, file_create_date_has_warning, metadata_warnings
 
 
 @dataclass(frozen=True)
@@ -28,6 +28,18 @@ class DeviceFix:
     timestamp_field: str
     timezone_offset: str | None
     device_name: str
+    image_width: int | None = None
+    image_height: int | None = None
+
+
+@dataclass(frozen=True)
+class FileCreateDateFix:
+    path: Path
+    selected_datetime: datetime
+    timestamp_field: str
+    timezone_offset: str | None
+    device_name: str
+    current_file_create_datetime: datetime
     image_width: int | None = None
     image_height: int | None = None
 
@@ -82,9 +94,37 @@ def unknown_device_files(candidates: list[Path], metadata_by_path: dict[Path, Me
     return sorted(fixes, key=_device_fix_sort_key)
 
 
+def file_create_date_fixes(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[FileCreateDateFix]:
+    fixes: list[FileCreateDateFix] = []
+
+    for path in candidates:
+        metadata = metadata_by_path[path]
+        if not file_create_date_has_warning(metadata) or metadata.file_create_datetime is None:
+            continue
+
+        fixes.append(
+            FileCreateDateFix(
+                path=path,
+                selected_datetime=metadata.selected_datetime,
+                timestamp_field=metadata.timestamp_field,
+                timezone_offset=metadata.timezone_offset,
+                device_name=metadata.device_name,
+                current_file_create_datetime=metadata.file_create_datetime,
+                image_width=metadata.image_width,
+                image_height=metadata.image_height,
+            )
+        )
+
+    return sorted(fixes, key=_file_create_date_fix_sort_key)
+
+
 def _timezone_fix_sort_key(fix: TimezoneFix) -> tuple[datetime, str, str]:
     return (fix.selected_datetime, fix.path.name.lower(), str(fix.path).lower())
 
 
 def _device_fix_sort_key(fix: DeviceFix) -> tuple[datetime, str, str]:
+    return (fix.selected_datetime, fix.path.name.lower(), str(fix.path).lower())
+
+
+def _file_create_date_fix_sort_key(fix: FileCreateDateFix) -> tuple[datetime, str, str]:
     return (fix.selected_datetime, fix.path.name.lower(), str(fix.path).lower())

@@ -4,15 +4,18 @@ from __future__ import annotations
 from pathlib import Path
 
 from snapsync.metadata import Metadata
+from snapsync.util.console import muted
 
 
 def file_fingerprint(path: Path, metadata: Metadata) -> str:
-    return " ".join(
-        [
-            _format_size(path),
-            _format_resolution(metadata),
-            metadata.selected_datetime.strftime("%H:%M:%S"),
-        ]
+    return muted(
+        " ".join(
+            [
+                _format_size(path),
+                _format_resolution(metadata),
+                metadata.selected_datetime.strftime("%H:%M:%S"),
+            ]
+        )
     )
 
 

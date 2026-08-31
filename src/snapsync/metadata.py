@@ -57,6 +57,7 @@ class Metadata:
     device_field: str | None = None
     image_width: int | None = None
     image_height: int | None = None
+    file_create_datetime: datetime | None = None
 
 
 def extract_metadata(path: Path, exiftool_path: str = "exiftool") -> Metadata:
@@ -101,6 +102,7 @@ def _metadata_from_exiftool(metadata: dict[str, object]) -> Metadata | None:
             device_name, device_field = _extract_device_name(metadata)
             timezone_offset, timezone_field = _extract_timezone_offset(metadata)
             image_width, image_height = _extract_image_dimensions(metadata)
+            file_create_datetime = _parse_datetime(metadata.get("FileCreateDate"))
             return Metadata(
                 selected_datetime=parsed,
                 timestamp_field=field,
@@ -111,6 +113,7 @@ def _metadata_from_exiftool(metadata: dict[str, object]) -> Metadata | None:
                 device_field=device_field,
                 image_width=image_width,
                 image_height=image_height,
+                file_create_datetime=file_create_datetime,
             )
     return None
 
@@ -123,7 +126,15 @@ def _filesystem_metadata(path: Path) -> Metadata:
         device_name="UnknownDevice",
         quality="filesystem_fallback",
         timezone_offset=None,
+        file_create_datetime=_file_birth_datetime(stat),
     )
+
+
+def _file_birth_datetime(stat: object) -> datetime | None:
+    birth_time = getattr(stat, "st_birthtime", None)
+    if birth_time is None:
+        return None
+    return datetime.fromtimestamp(birth_time)
 
 
 def _read_exiftool_metadata(path: Path, exiftool_path: str) -> dict[str, object] | None:

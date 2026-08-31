@@ -16,6 +16,8 @@ def metadata_warnings(metadata: Metadata) -> set[str]:
     warnings: set[str] = set()
     if metadata.timestamp_field != "DateTimeOriginal":
         warnings.add("timestamp")
+    if file_create_date_has_warning(metadata):
+        warnings.add("file_create_date")
     if metadata.device_name == "UnknownDevice":
         warnings.add("device")
     if timezone_has_warning(metadata):
@@ -32,6 +34,13 @@ def timezone_has_warning(metadata: Metadata) -> bool:
         return True
 
     return metadata.timezone_offset != expected_helsinki_offset(metadata.selected_datetime)
+
+
+def file_create_date_has_warning(metadata: Metadata) -> bool:
+    return (
+        metadata.file_create_datetime is not None
+        and metadata.file_create_datetime != metadata.selected_datetime
+    )
 
 
 def metadata_years(metadata_by_path: dict[Path, Metadata]) -> list[int]:

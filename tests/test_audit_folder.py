@@ -70,14 +70,15 @@ class AuditFolderTests(unittest.TestCase):
             )
             self.assertIn("🔍 Audit Details", plain_text)
             compact_text = _compact(plain_text)
-            self.assertIn("Filename Date Time Taken From", compact_text)
+            self.assertIn("Filename Date Time Taken From File Created", compact_text)
             self.assertIn(
-                "IMG_0001.JPG 18-05-2026 14:22:11 DateTimeOriginal +03:00 iPhone 16 Pro 5 B res? 14:22:11",
+                "IMG_0001.JPG 18-05-2026 14:22:11 DateTimeOriginal (none) +03:00 iPhone 16 Pro 5 B res? 14:22:11",
                 compact_text,
             )
             self.assertIn("⚠️ clip.mov 19-05-2026 09:01:02 MediaCreateDate", compact_text)
             self.assertIn("⚠️ Issues", plain_text)
             self.assertIn("Timezone mismatch/missing       1", plain_text)
+            self.assertIn("File created date differs       0", plain_text)
             self.assertIn("Timestamp not DateTimeOriginal  1", plain_text)
             self.assertIn("Unknown device                  0", plain_text)
             self.assertGreater(
@@ -265,7 +266,7 @@ class AuditFolderTests(unittest.TestCase):
             text = output.getvalue()
             self.assertEqual(exit_code, 0)
             self.assertIn(
-                "IMG_2026.JPG 25-06-2026 10:16:13 DateTimeOriginal +05:30 iPhone 13 Pro",
+                "IMG_2026.JPG 25-06-2026 10:16:13 DateTimeOriginal (none) +05:30 iPhone 13 Pro",
                 _compact(_strip_colors(text)),
             )
             self.assertNotIn("\033[31m+05:30\033[0m", text)
@@ -383,7 +384,7 @@ class AuditFolderTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn(
-                "IMG_5537.JPG 20-12-2025 16:48:24 DateTimeOriginal +02:00 Canon EOS M50",
+                "IMG_5537.JPG 20-12-2025 16:48:24 DateTimeOriginal (none) +02:00 Canon EOS M50",
                 _compact(_strip_colors(output.getvalue())),
             )
             self.assertNotIn("\033[31m+02:00\033[0m", output.getvalue())
@@ -452,6 +453,43 @@ class AuditFolderTests(unittest.TestCase):
             self.assertIn("\033[33mfallback.jpg\033[0m", text)
             self.assertNotIn("\033[31mCreateDate\033[0m", text)
             self.assertNotIn("\033[31mfallback.jpg\033[0m", text)
+
+    def test_marks_file_created_mismatch_red(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "finder-wrong.jpg"
+            photo.write_bytes(b"photo")
+            settings = _settings(root)
+            output = StringIO()
+
+            metadata_by_path = {
+                photo: Metadata(
+                    selected_datetime=datetime(2026, 7, 26, 11, 28, 0),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="iPhone 16 Pro",
+                    quality="metadata",
+                    timezone_offset="+03:00",
+                    file_create_datetime=datetime(2026, 8, 1, 9, 10, 11),
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.audit_folder.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_folder_audit(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            text = output.getvalue()
+            plain_text = _strip_colors(text)
+            self.assertIn("File created date differs       1", plain_text)
+            self.assertIn("\033[31mfinder-wrong.jpg\033[0m", text)
+            self.assertIn("\033[31m26-07-2026\033[0m", text)
+            self.assertIn("\033[31m11:28:00\033[0m", text)
+            self.assertIn("\033[31m01-08-2026 09:10:11\033[0m", text)
 
     def test_marks_missing_timezone_red(self):
         with TemporaryDirectory() as temp_dir:
@@ -548,6 +586,7 @@ class AuditFolderTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             plain_text = _strip_colors(text)
             self.assertIn("Timezone mismatch/missing       2", plain_text)
+            self.assertIn("File created date differs       0", plain_text)
             self.assertIn("Timestamp not DateTimeOriginal  1", plain_text)
             self.assertIn("Unknown device                  1", plain_text)
 
@@ -607,6 +646,53 @@ class AuditFolderTests(unittest.TestCase):
             second_index = next(index for index, line in enumerate(lines) if line.strip().startswith("second.jpg"))
             third_index = next(index for index, line in enumerate(lines) if line.strip().startswith("third.jpg"))
             self.assertLess(second_index, third_index)
+
+    def test_does_not_print_divider_between_red_and_plain_rows_on_same_date(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            red_row = root / "finder-wrong.jpg"
+            plain_row = root / "finder-right.jpg"
+            for path in (red_row, plain_row):
+                path.write_bytes(b"photo")
+            settings = _settings(root)
+            output = StringIO()
+
+            metadata_by_path = {
+                red_row: Metadata(
+                    selected_datetime=datetime(2026, 8, 26, 11, 33, 3),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="Canon EOS 700D",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                    file_create_datetime=datetime(2026, 7, 26, 11, 33, 4),
+                ),
+                plain_row: Metadata(
+                    selected_datetime=datetime(2026, 8, 26, 11, 33, 4),
+                    timestamp_field="DateTimeOriginal",
+                    device_name="Canon EOS 700D",
+                    quality="metadata",
+                    timezone_offset="+05:30",
+                    file_create_datetime=datetime(2026, 8, 26, 11, 33, 4),
+                ),
+            }
+
+            with (
+                patch(
+                    "snapsync.actions.audit_folder.read_metadata_batch_or_fallback",
+                    return_value=metadata_by_path,
+                ),
+                redirect_stdout(output),
+            ):
+                exit_code = run_folder_audit(root, settings)
+
+            self.assertEqual(exit_code, 0)
+            lines = _strip_colors(output.getvalue()).splitlines()
+            header = next(line for line in lines if line.startswith("Filename"))
+            wrong_index = next(index for index, line in enumerate(lines) if "finder-wrong.jpg" in line)
+            right_index = next(index for index, line in enumerate(lines) if line.strip().startswith("finder-right.jpg"))
+            lines_between = lines[wrong_index + 1 : right_index]
+
+            self.assertFalse(any(set(line) == {"─"} and len(line) == len(header) for line in lines_between))
 
 
 def _settings(root: Path) -> Settings:

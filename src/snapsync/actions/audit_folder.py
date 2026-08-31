@@ -9,6 +9,7 @@ from snapsync.file_fingerprint import file_fingerprint
 from snapsync.metadata import Metadata, TIMESTAMP_FIELDS
 from snapsync.metadata_audit import (
     expected_helsinki_offset,
+    file_create_date_has_warning,
     helsinki_rule_line,
     metadata_warnings,
     metadata_years,
@@ -47,8 +48,9 @@ def run_folder_audit(source_folder: Path, settings: Settings) -> int:
     sorted_candidates = _sort_paths_by_taken_at(candidates, metadata_by_path)
     timezone_reference_offsets = _timezone_reference_offsets(metadata_by_path)
     rows = [_metadata_row(path, metadata_by_path[path], timezone_reference_offsets) for path in sorted_candidates]
+    group_values = [format_display_date(metadata_by_path[path].selected_datetime) for path in sorted_candidates]
     print_section_heading("Audit Details", icon=ICONS["audit"])
-    _print_table(rows)
+    _print_table(rows, group_values)
     _print_issues_section(sorted_candidates, metadata_by_path, timezone_reference_offsets)
     return 0
 
@@ -65,12 +67,12 @@ def _sort_paths_by_taken_at(candidates: list[Path], metadata_by_path: dict[Path,
 
 
 def _metadata_row(path: Path, metadata: Metadata, timezone_reference_offsets: set[str]) -> list[str]:
-    taken_at = metadata.selected_datetime
     return [
         _file_cell(path, metadata, timezone_reference_offsets),
-        format_display_date(taken_at),
-        taken_at.strftime("%H:%M:%S"),
+        _capture_date_cell(metadata),
+        _capture_time_cell(metadata),
         _timestamp_field_cell(metadata),
+        _file_create_date_cell(metadata),
         _timezone_cell(metadata, timezone_reference_offsets),
         _device_cell(metadata),
         file_fingerprint(path, metadata),
@@ -79,17 +81,41 @@ def _metadata_row(path: Path, metadata: Metadata, timezone_reference_offsets: se
 
 def _file_cell(path: Path, metadata: Metadata, timezone_reference_offsets: set[str]) -> str:
     warnings = _audit_warnings(metadata, timezone_reference_offsets)
-    if warnings & {"timezone", "device"}:
+    if warnings & {"timezone", "device", "file_create_date"}:
         return f"{ICONS['warning']} {danger(path.name)}"
     if "timestamp" in warnings:
         return f"{ICONS['warning']} {warning(path.name)}"
     return path.name
 
 
+def _capture_date_cell(metadata: Metadata) -> str:
+    value = format_display_date(metadata.selected_datetime)
+    if file_create_date_has_warning(metadata):
+        return danger(value)
+    return value
+
+
+def _capture_time_cell(metadata: Metadata) -> str:
+    value = metadata.selected_datetime.strftime("%H:%M:%S")
+    if file_create_date_has_warning(metadata):
+        return danger(value)
+    return value
+
+
 def _timestamp_field_cell(metadata: Metadata) -> str:
     if metadata.timestamp_field != "DateTimeOriginal":
         return warning(metadata.timestamp_field)
     return metadata.timestamp_field
+
+
+def _file_create_date_cell(metadata: Metadata) -> str:
+    if metadata.file_create_datetime is None:
+        return "(none)"
+
+    value = metadata.file_create_datetime.strftime("%d-%m-%Y %H:%M:%S")
+    if file_create_date_has_warning(metadata):
+        return danger(value)
+    return value
 
 
 def _device_cell(metadata: Metadata) -> str:
@@ -156,20 +182,22 @@ def _print_issues_section(
     print_key_values(
         [
             ("Timezone mismatch/missing", warning_counts["timezone"]),
+            ("File created date differs", warning_counts["file_create_date"]),
             ("Timestamp not DateTimeOriginal", warning_counts["timestamp"]),
             ("Unknown device", warning_counts["device"]),
         ]
     )
 
 
-def _print_table(rows: list[list[str]]) -> None:
+def _print_table(rows: list[list[str]], group_values: list[str]) -> None:
     headers = [
         "Filename",
         "Date",
         "Time",
         "Taken From",
+        "File Created",
         "Offset",
         "Device",
         "Fingerprint",
     ]
-    print_grouped_table(headers, rows, [row[1] for row in rows])
+    print_grouped_table(headers, rows, group_values)

@@ -80,10 +80,10 @@ class AuditFolderTests(unittest.TestCase):
             self.assertIn("\033[90m5 B res? 14:22:11\033[0m", text)
             self.assertIn("⚠️ clip.mov 19-05-2026 09:01:02 MediaCreateDate", compact_text)
             self.assertIn("⚠️ Issues", plain_text)
-            self.assertIn("Timezone mismatch/missing       1", plain_text)
-            self.assertIn("File created date differs       0", plain_text)
-            self.assertIn("Timestamp not DateTimeOriginal  1", plain_text)
-            self.assertIn("Unknown device                  0", plain_text)
+            self.assertIn("Timezone mismatch/missing      1", plain_text)
+            self.assertIn("File created date differs      0", plain_text)
+            self.assertIn("Timestamp source needs review  1", plain_text)
+            self.assertIn("Unknown device                 0", plain_text)
             self.assertGreater(
                 plain_text.index("Issues"),
                 plain_text.index("clip.mov"),
@@ -274,7 +274,7 @@ class AuditFolderTests(unittest.TestCase):
             )
             self.assertNotIn("\033[31m+05:30\033[0m", text)
             self.assertNotIn("\033[31mIMG_2026.JPG\033[0m", text)
-            self.assertIn("Timezone mismatch/missing       0", _strip_colors(text))
+            self.assertIn("Timezone mismatch/missing      0", _strip_colors(text))
 
     def test_keeps_winter_timezone_plain_when_only_summer_reference_exists(self):
         with TemporaryDirectory() as temp_dir:
@@ -316,7 +316,7 @@ class AuditFolderTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertNotIn("\033[31m+05:30\033[0m", text)
             self.assertNotIn("\033[31mIMG_WINTER.JPG\033[0m", text)
-            self.assertIn("Timezone mismatch/missing       0", _strip_colors(text))
+            self.assertIn("Timezone mismatch/missing      0", _strip_colors(text))
 
     def test_marks_winter_timezone_red_when_winter_reference_exists(self):
         with TemporaryDirectory() as temp_dir:
@@ -457,6 +457,61 @@ class AuditFolderTests(unittest.TestCase):
             self.assertNotIn("\033[31mCreateDate\033[0m", text)
             self.assertNotIn("\033[31mfallback.jpg\033[0m", text)
 
+    def test_iphone_mov_create_date_uses_plain_filename_and_taken_from(self):
+        from snapsync.actions.audit_folder import _metadata_row, _audit_warnings
+
+        metadata = Metadata(
+            selected_datetime=datetime(2026, 1, 5, 12),
+            timestamp_field="CreateDate",
+            device_name="iPhone 16 Pro",
+            quality="metadata",
+            timezone_offset="+02:00",
+        )
+        for filename in ("clip.mov", "clip.MOV"):
+            with self.subTest(filename=filename):
+                path = Path(filename)
+                row = _metadata_row(path, metadata, {"+02:00"})
+                self.assertEqual(row[0], filename)
+                self.assertEqual(row[3], "CreateDate")
+                self.assertNotIn("timestamp", _audit_warnings(metadata, {"+02:00"}, path))
+
+    def test_mov_timestamp_exception_requires_iphone_create_date(self):
+        from dataclasses import replace
+        from snapsync.actions.audit_folder import _metadata_row
+
+        metadata = Metadata(
+            selected_datetime=datetime(2026, 1, 5, 12),
+            timestamp_field="CreateDate",
+            device_name="iPhone 16 Pro",
+            quality="metadata",
+            timezone_offset="+02:00",
+        )
+        cases = (
+            replace(metadata, device_name="Canon"),
+            replace(metadata, timestamp_field="MediaCreateDate"),
+            replace(metadata, timestamp_field="FileModifyDate"),
+        )
+        for item in cases:
+            with self.subTest(device=item.device_name, source=item.timestamp_field):
+                row = _metadata_row(Path("iPhone_clip.mov"), item, {"+02:00"})
+                self.assertIn("\033[33m", row[0])
+                self.assertIn("\033[33m", row[3])
+
+    def test_iphone_mov_create_date_keeps_other_warnings(self):
+        from snapsync.actions.audit_folder import _metadata_row
+
+        metadata = Metadata(
+            selected_datetime=datetime(2026, 1, 5, 12),
+            timestamp_field="CreateDate",
+            device_name="iPhone 16 Pro",
+            quality="metadata",
+            timezone_offset="+03:00",
+            file_create_datetime=datetime(2026, 1, 6, 12),
+        )
+        row = _metadata_row(Path("clip.mov"), metadata, {"+02:00"})
+        self.assertIn("\033[31m", row[0])
+        self.assertEqual(row[3], "CreateDate")
+
     def test_marks_file_created_mismatch_red(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -488,7 +543,7 @@ class AuditFolderTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             text = output.getvalue()
             plain_text = _strip_colors(text)
-            self.assertIn("File created date differs       1", plain_text)
+            self.assertIn("File created date differs      1", plain_text)
             self.assertIn("\033[31mfinder-wrong.jpg\033[0m", text)
             self.assertIn("\033[31m26-07-2026\033[0m", text)
             self.assertIn("\033[31m11:28:00\033[0m", text)
@@ -524,7 +579,7 @@ class AuditFolderTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             text = output.getvalue()
-            self.assertIn("File created date differs       0", _strip_colors(text))
+            self.assertIn("File created date differs      0", _strip_colors(text))
             self.assertIn("\033[90m26-08-2026 11:28:00\033[0m", text)
             self.assertNotIn("\033[31m26-08-2026 11:28:00\033[0m", text)
 
@@ -622,10 +677,10 @@ class AuditFolderTests(unittest.TestCase):
             text = output.getvalue()
             self.assertEqual(exit_code, 0)
             plain_text = _strip_colors(text)
-            self.assertIn("Timezone mismatch/missing       2", plain_text)
-            self.assertIn("File created date differs       0", plain_text)
-            self.assertIn("Timestamp not DateTimeOriginal  1", plain_text)
-            self.assertIn("Unknown device                  1", plain_text)
+            self.assertIn("Timezone mismatch/missing      2", plain_text)
+            self.assertIn("File created date differs      0", plain_text)
+            self.assertIn("Timestamp source needs review  1", plain_text)
+            self.assertIn("Unknown device                 1", plain_text)
 
     def test_prints_divider_when_file_date_changes(self):
         with TemporaryDirectory() as temp_dir:

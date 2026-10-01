@@ -12,9 +12,24 @@ from snapsync.util.console import format_display_date
 HELSINKI_TIMEZONE = ZoneInfo("Europe/Helsinki")
 
 
-def metadata_warnings(metadata: Metadata) -> set[str]:
+def timestamp_has_warning(metadata: Metadata, path: Path | None = None) -> bool:
+    # iPhone MOV videos commonly use CreateDate instead of DateTimeOriginal.
+    # This expected source should not turn the Filename or Taken From cells
+    # yellow. Require an iPhone identified by metadata, not just the filename;
+    # other timestamp fallbacks and independent audit warnings still apply.
+    if (
+        path is not None
+        and path.suffix.lower() == ".mov"
+        and metadata.device_name.casefold().startswith("iphone")
+        and metadata.timestamp_field == "CreateDate"
+    ):
+        return False
+    return metadata.timestamp_field != "DateTimeOriginal"
+
+
+def metadata_warnings(metadata: Metadata, path: Path | None = None) -> set[str]:
     warnings: set[str] = set()
-    if metadata.timestamp_field != "DateTimeOriginal":
+    if timestamp_has_warning(metadata, path):
         warnings.add("timestamp")
     if file_create_date_has_warning(metadata):
         warnings.add("file_create_date")

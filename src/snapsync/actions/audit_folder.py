@@ -13,6 +13,7 @@ from snapsync.metadata_audit import (
     helsinki_rule_line,
     metadata_warnings,
     metadata_years,
+    timestamp_has_warning,
     timezone_has_warning,
 )
 from snapsync.metadata_reader import read_metadata_batch_or_fallback
@@ -71,7 +72,7 @@ def _metadata_row(path: Path, metadata: Metadata, timezone_reference_offsets: se
         _file_cell(path, metadata, timezone_reference_offsets),
         _capture_date_cell(metadata),
         _capture_time_cell(metadata),
-        _timestamp_field_cell(metadata),
+        _timestamp_field_cell(metadata, path),
         _file_create_date_cell(metadata),
         _timezone_cell(metadata, timezone_reference_offsets),
         _device_cell(metadata),
@@ -80,7 +81,7 @@ def _metadata_row(path: Path, metadata: Metadata, timezone_reference_offsets: se
 
 
 def _file_cell(path: Path, metadata: Metadata, timezone_reference_offsets: set[str]) -> str:
-    warnings = _audit_warnings(metadata, timezone_reference_offsets)
+    warnings = _audit_warnings(metadata, timezone_reference_offsets, path)
     if warnings & {"timezone", "device", "file_create_date"}:
         return f"{ICONS['warning']} {danger(path.name)}"
     if "timestamp" in warnings:
@@ -102,8 +103,8 @@ def _capture_time_cell(metadata: Metadata) -> str:
     return value
 
 
-def _timestamp_field_cell(metadata: Metadata) -> str:
-    if metadata.timestamp_field != "DateTimeOriginal":
+def _timestamp_field_cell(metadata: Metadata, path: Path | None = None) -> str:
+    if timestamp_has_warning(metadata, path):
         return warning(metadata.timestamp_field)
     return metadata.timestamp_field
 
@@ -130,8 +131,8 @@ def _timezone_cell(metadata: Metadata, timezone_reference_offsets: set[str]) -> 
     return metadata.timezone_offset or "(none)"
 
 
-def _audit_warnings(metadata: Metadata, timezone_reference_offsets: set[str]) -> set[str]:
-    warnings = metadata_warnings(metadata)
+def _audit_warnings(metadata: Metadata, timezone_reference_offsets: set[str], path: Path | None = None) -> set[str]:
+    warnings = metadata_warnings(metadata, path)
     if not _timezone_warning_is_supported(metadata, timezone_reference_offsets):
         warnings.discard("timezone")
     return warnings
@@ -175,7 +176,7 @@ def _print_issues_section(
     warning_counts: Counter[str] = Counter()
 
     for path in candidates:
-        warnings = _audit_warnings(metadata_by_path[path], timezone_reference_offsets)
+        warnings = _audit_warnings(metadata_by_path[path], timezone_reference_offsets, path)
         warning_counts.update(warnings)
 
     print_section_heading("Issues", icon=ICONS["warning"])
@@ -183,7 +184,7 @@ def _print_issues_section(
         [
             ("Timezone mismatch/missing", warning_counts["timezone"]),
             ("File created date differs", warning_counts["file_create_date"]),
-            ("Timestamp not DateTimeOriginal", warning_counts["timestamp"]),
+            ("Timestamp source needs review", warning_counts["timestamp"]),
             ("Unknown device", warning_counts["device"]),
         ]
     )

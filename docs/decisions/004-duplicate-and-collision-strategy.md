@@ -21,6 +21,10 @@ Duplicates:
 - split into files already in the destination and files repeated in the source folder
 - source-folder duplicate groups are written as CSV reports under
   `DESTINATION_FOLDER/_snapsync_reports/`
+- destination indexing hashes only files whose byte sizes match at least one
+  incoming source file; size is a filter, and SHA-256 still decides duplicates
+- hidden, report, recycle-bin, and filesystem metadata directories are pruned
+  before destination traversal
 
 Filename collisions:
 - preserved with a collision suffix
@@ -52,6 +56,7 @@ safe to skip because the hash is different, so snapsync keeps both files.
 
 ## Future Risks
 
-- large destination hash lookup performance
+- destination traversal still scales with archive file count, and large groups
+  of files with identical byte sizes still require content reads
 - edited exports with near-identical content
 - live-photo related duplicates

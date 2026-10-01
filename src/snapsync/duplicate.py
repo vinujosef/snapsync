@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,19 +24,38 @@ def calculate_hash(path: Path) -> str:
     return digest.hexdigest()
 
 
-def build_hash_index(destination_index_root: Path) -> dict[str, Path]:
+def build_hash_index(
+    destination_index_root: Path, candidate_sizes: set[int] | None = None,
+) -> dict[str, Path]:
+    """Hash only possible duplicates; equal content must have equal byte size.
+
+    None preserves the full-index behavior for callers without source sizes.
+    Directory pruning avoids traversing reports and filesystem metadata.
+    """
     index: dict[str, Path] = {}
-    if not destination_index_root.exists():
+    if candidate_sizes == set() or not destination_index_root.exists():
         return index
 
-    for path in destination_index_root.rglob("*"):
-        if not path.is_file() or _is_system_file(path):
-            continue
-        try:
-            file_hash = calculate_hash(path)
-        except OSError:
-            continue
-        index.setdefault(file_hash, path)
+    for directory, directories, filenames in os.walk(destination_index_root):
+        directories[:] = [
+            name for name in directories
+            if not name.startswith(".") and name not in {
+                "_snapsync_reports", "@eaDir", "System Volume Information", "$RECYCLE.BIN",
+            }
+        ]
+        for name in filenames:
+            path = Path(directory) / name
+            if _is_system_file(path):
+                continue
+            try:
+                if not path.is_file():
+                    continue
+                if candidate_sizes is not None and path.stat().st_size not in candidate_sizes:
+                    continue
+                file_hash = calculate_hash(path)
+            except OSError:
+                continue
+            index.setdefault(file_hash, path)
     return index
 
 

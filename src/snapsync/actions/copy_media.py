@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 
 from config.settings import Settings
 from snapsync.classifier import UNKNOWN, classify
@@ -23,14 +24,30 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
     run_started_at = datetime.now()
 
     try:
+        phase_started = perf_counter()
+        logger.info("Scanning source files...")
         candidates = scan_source(source_folder, settings)
         summary.source_files_found = len(candidates)
+        logger.info(f"Found {len(candidates)} source files in {perf_counter() - phase_started:.2f}s")
+        phase_started = perf_counter()
+        logger.info("Reading source metadata...")
         metadata_by_path = read_metadata_batch_or_fallback(candidates, settings)
+        logger.info(f"Source metadata read in {perf_counter() - phase_started:.2f}s")
         timezone_plan = build_timezone_correction_plan(metadata_by_path, settings)
         if timezone_plan and not confirm_timezone_correction(timezone_plan):
             logger.warning("Canon timezone correction was not confirmed; Canon timestamps are unchanged")
             timezone_plan = None
-        hash_index = build_hash_index(settings.destination_folder)
+        candidate_sizes: set[int] = set()
+        for path in candidates:
+            try:
+                candidate_sizes.add(path.stat().st_size)
+            except OSError:
+                # The per-file loop reports inaccessible source files.
+                pass
+        phase_started = perf_counter()
+        logger.info("Checking destination duplicates (hashing matching file sizes only)...")
+        hash_index = build_hash_index(settings.destination_folder, candidate_sizes)
+        logger.info(f"Destination duplicate check finished in {perf_counter() - phase_started:.2f}s")
         run_hash_index: dict[str, Path] = {}
         run_destination_index: dict[str, Path] = {}
         duplicate_groups: dict[str, DuplicateGroup] = {}
@@ -38,7 +55,6 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
         logger.error(f"Startup failed: {exc}")
         return 1
 
-    logger.info(f"Found {summary.source_files_found} source files")
     if settings.dry_run:
         logger.warning("DRY_RUN is enabled; no files will be copied")
 
@@ -52,7 +68,9 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
 
             metadata = metadata_by_path[source_path]
             selected_datetime = apply_timezone_correction(metadata, timezone_plan)
+            phase_started = perf_counter()
             file_hash = calculate_hash(source_path)
+            logger.info(f"Hashed {source_path.name} in {perf_counter() - phase_started:.2f}s")
             target_path = build_destination_path(settings, selected_datetime, media_type, source_path.name)
 
             decision = decide_destination(file_hash, target_path, hash_index, run_hash_index)
@@ -73,6 +91,7 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
                 logger.error(f"Could not process {source_path}: {decision.reason}")
                 continue
 
+            phase_started = perf_counter()
             copy_file(source_path, decision.destination, settings.dry_run)
             run_hash_index[file_hash] = source_path
             run_destination_index[file_hash] = decision.destination
@@ -81,7 +100,10 @@ def run_media_copy(source_folder: Path, settings: Settings) -> int:
                 logger.info(f"Will copy {source_path} -> {decision.destination}")
             else:
                 summary.copied_files += 1
-                logger.success(f"Copied {source_path} -> {decision.destination}")
+                logger.success(
+                    f"Copied {source_path} -> {decision.destination} "
+                    f"in {perf_counter() - phase_started:.2f}s"
+                )
             summary.record_output_folder(media_type, decision.destination)
             if decision.collision:
                 summary.filename_collisions_handled += 1

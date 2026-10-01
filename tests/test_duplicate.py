@@ -1,11 +1,39 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from snapsync.duplicate import build_hash_index, calculate_hash, decide_destination
 
 
 class DuplicateTests(unittest.TestCase):
+    def test_size_filter_reads_only_possible_duplicates(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            match = root / "different-name.jpg"
+            match.write_bytes(b"same")
+            (root / "large.mov").write_bytes(b"unrelated video")
+            with patch("snapsync.duplicate.calculate_hash", wraps=calculate_hash) as hashing:
+                index = build_hash_index(root, {4})
+            hashing.assert_called_once_with(match)
+            self.assertEqual(index, {calculate_hash(match): match})
+
+    def test_empty_source_does_not_walk_destination(self):
+        with patch("snapsync.duplicate.os.walk") as walk:
+            self.assertEqual(build_hash_index(Path("/unused"), set()), {})
+        walk.assert_not_called()
+
+    def test_system_directories_are_pruned(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for name in (".hidden", "_snapsync_reports", "@eaDir"):
+                folder = root / name
+                folder.mkdir()
+                (folder / "data.jpg").write_bytes(b"same")
+            with patch("snapsync.duplicate.calculate_hash") as hashing:
+                self.assertEqual(build_hash_index(root, {4}), {})
+            hashing.assert_not_called()
+
     def test_build_hash_index_ignores_system_files(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

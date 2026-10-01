@@ -8,10 +8,38 @@ import unittest
 
 from config.settings import Settings
 from snapsync.actions.copy_media import run_media_copy
+from snapsync.duplicate import calculate_hash
 from snapsync.metadata import Metadata
 
 
 class CopyMediaTests(unittest.TestCase):
+    def test_existing_duplicate_with_different_filename_is_skipped(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source_folder = root / "source"
+            source_folder.mkdir()
+            source = source_folder / "incoming.jpg"
+            source.write_bytes(b"same photo")
+            destination = root / "destination"
+            destination.mkdir()
+            (destination / "old-name.jpg").write_bytes(source.read_bytes())
+            (destination / "unrelated.mov").write_bytes(b"a much larger unrelated video")
+            metadata = Metadata(
+                selected_datetime=datetime(2026, 5, 18),
+                timestamp_field="DateTimeOriginal", device_name="iPhone",
+                quality="metadata",
+            )
+            with (
+                patch("snapsync.actions.copy_media.read_metadata_batch_or_fallback",
+                      return_value={source: metadata}),
+                patch("snapsync.duplicate.calculate_hash", wraps=calculate_hash) as hashing,
+                redirect_stdout(StringIO()),
+            ):
+                exit_code = run_media_copy(source_folder, _settings(destination, dry_run=False))
+            self.assertEqual(exit_code, 0)
+            hashing.assert_called_once_with(destination / "old-name.jpg")
+            self.assertFalse((destination / "2026").exists())
+
     def test_copies_current_filename_to_destination_folder(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

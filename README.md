@@ -104,6 +104,11 @@ snapsync "/path/to/source-folder"
 
 Every action prints the total run time when it finishes.
 
+Copy also prints timings for scanning, metadata reading, destination duplicate
+checking, source hashing, and individual copies. Destination duplicate checking
+only reads file contents when their sizes match incoming files; it still scans
+the archive's directory entries. Exact duplicates remain checked by SHA-256.
+
 ## Config
 
 snapsync reads `.env`.

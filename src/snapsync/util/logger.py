@@ -69,4 +69,5 @@ def _log(level: str, message: str, stream=sys.stdout) -> None:
         return
     color = COLORS.get(level, "")
     symbol = SYMBOLS.get(level, "•")
-    print(f"{color}{symbol} {message}{RESET}", file=stream)
+    spacing = "   " if level == "INFO" else " "
+    print(f"{color}{symbol}{spacing}{message}{RESET}", file=stream)

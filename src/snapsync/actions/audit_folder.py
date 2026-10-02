@@ -83,9 +83,9 @@ def _metadata_row(path: Path, metadata: Metadata, timezone_reference_offsets: se
 def _file_cell(path: Path, metadata: Metadata, timezone_reference_offsets: set[str]) -> str:
     warnings = _audit_warnings(metadata, timezone_reference_offsets, path)
     if warnings & {"timezone", "device", "file_create_date"}:
-        return f"{ICONS['warning']} {danger(path.name)}"
+        return f"{ICONS['warning']}  {danger(path.name)}"
     if "timestamp" in warnings:
-        return f"{ICONS['warning']} {warning(path.name)}"
+        return f"{ICONS['warning']}  {warning(path.name)}"
     return path.name
 
 
@@ -157,8 +157,8 @@ def _print_info_section(file_count: int) -> None:
     print_key_values([("Files", file_count)])
     print()
     print(cyan("Legend"))
-    print(warning(f"{ICONS['warning']} yellow = review timestamp source"))
-    print(danger(f"{ICONS['warning']} red = needs review"))
+    print(warning(f"{ICONS['warning']}  yellow = review timestamp source"))
+    print(danger(f"{ICONS['warning']}  red = needs review"))
 
 
 def _print_rules_section(metadata_by_path: dict[Path, Metadata]) -> None:

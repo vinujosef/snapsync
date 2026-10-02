@@ -160,19 +160,19 @@ def _emit(value: str = "") -> None:
 
 def print_title(title: str, *, icon: str | None = None) -> None:
     _emit()
-    label = f"{icon} {title}" if icon else title
+    label = f"{icon}  {title}" if icon else title
     _emit(heading(label, bold=True))
 
 
 def print_section_heading(title: str, *, icon: str | None = None) -> None:
     _emit()
-    label = f"{icon} {title}" if icon else title
+    label = f"{icon}  {title}" if icon else title
     _emit(heading(label, bold=True))
 
 
 def print_notice(title: str, detail: str | None = None, *, icon: str = ICONS["info"]) -> None:
     _emit()
-    _emit(warning(f"{icon} {title}", bold=True))
+    _emit(warning(f"{icon}  {title}", bold=True))
     if detail:
         _emit(muted(detail))
 

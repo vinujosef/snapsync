@@ -10,6 +10,27 @@ from snapsync.summary import RunSummary
 
 
 class SummaryTests(unittest.TestCase):
+    def test_copy_summary_lists_duplicate_paths_under_matching_rows(self):
+        summary = RunSummary(
+            duplicate_files_skipped=2,
+            duplicates_already_in_destination=1,
+            duplicates_repeated_in_source=1,
+            duplicate_skipped_files=["/source/existing.jpg", "/source/repeated.jpg"],
+            already_copied_files=["/source/existing.jpg"],
+            repeated_source_files=["/source/repeated.jpg"],
+        )
+        with redirect_stdout(StringIO()) as output:
+            summary.print()
+        text = _strip_colors(output.getvalue())
+        results, details = text.split("Duplicate Details", 1)
+        self.assertIn("• /source/existing.jpg", results)
+        self.assertIn("• /source/repeated.jpg", results)
+        repeated, already = details.split("Already copied before", 1)
+        self.assertIn("• /source/repeated.jpg", repeated)
+        self.assertNotIn("/source/existing.jpg", repeated)
+        self.assertIn("• /source/existing.jpg", already)
+        self.assertNotIn("/source/repeated.jpg", already)
+
     def test_rename_summary_aligns_counts_and_lists_details_under_their_rows(self):
         summary = RunSummary(
             action_label="rename", source_files_found=120, media_files_processed=118,

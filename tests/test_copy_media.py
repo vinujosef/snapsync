@@ -33,12 +33,14 @@ class CopyMediaTests(unittest.TestCase):
                 patch("snapsync.actions.copy_media.read_metadata_batch_or_fallback",
                       return_value={source: metadata}),
                 patch("snapsync.duplicate.calculate_hash", wraps=calculate_hash) as hashing,
-                redirect_stdout(StringIO()),
+                redirect_stdout(StringIO()) as output,
             ):
                 exit_code = run_media_copy(source_folder, _settings(destination, dry_run=False))
             self.assertEqual(exit_code, 0)
             hashing.assert_called_once_with(destination / "old-name.jpg")
             self.assertFalse((destination / "2026").exists())
+            summary_text = output.getvalue().split("snapsync Summary", 1)[1]
+            self.assertEqual(summary_text.count(str(source)), 2)
 
     def test_copies_current_filename_to_destination_folder(self):
         with TemporaryDirectory() as temp_dir:

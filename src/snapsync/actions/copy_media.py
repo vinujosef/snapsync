@@ -127,13 +127,16 @@ def _record_skipped_duplicate(
     summary: RunSummary,
 ) -> None:
     summary.duplicate_files_skipped += 1
+    summary.duplicate_skipped_files.append(str(source_path))
     if duplicate_kind == "destination":
         summary.duplicates_already_in_destination += 1
+        summary.already_copied_files.append(str(source_path))
         return
     if duplicate_kind != "source":
         return
 
     summary.duplicates_repeated_in_source += 1
+    summary.repeated_source_files.append(str(source_path))
     group = duplicate_groups.setdefault(
         file_hash,
         DuplicateGroup(

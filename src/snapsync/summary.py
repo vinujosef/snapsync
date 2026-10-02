@@ -24,6 +24,9 @@ class RunSummary:
     duplicate_files_skipped: int = 0
     duplicates_already_in_destination: int = 0
     duplicates_repeated_in_source: int = 0
+    duplicate_skipped_files: list[str] = field(default_factory=list)
+    already_copied_files: list[str] = field(default_factory=list)
+    repeated_source_files: list[str] = field(default_factory=list)
     filename_collisions_handled: int = 0
     unknown_files: int = 0
     errors: int = 0
@@ -107,8 +110,13 @@ class RunSummary:
             )
 
         print_title("snapsync Summary", icon=ICONS["app"])
+        details = {
+            "Skipped duplicates": self.duplicate_skipped_files,
+            "Already copied before": self.already_copied_files,
+            "Repeated in source folder": self.repeated_source_files,
+        }
         for index, (title, rows) in enumerate(sections, start=1):
-            self._print_section(title, rows)
+            self._print_section(title, rows, details=details)
         self._print_output_folders()
 
     def _result_rows(self) -> list[tuple[str, int, str]]:

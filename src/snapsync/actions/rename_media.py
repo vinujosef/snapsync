@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import sys
+import re
+from collections import Counter
 
 from config.settings import Settings
 from snapsync.classifier import UNKNOWN, classify
@@ -26,6 +28,7 @@ class RenameChange:
     taken_date: str
     fingerprint: str
     collision: bool
+    duplicate: bool = False
 
 
 def run_media_rename(source_folder: Path, settings: Settings) -> int:
@@ -39,7 +42,7 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
 
     try:
         candidates = scan_source(source_folder, settings)
-        summary.source_files_found = len(candidates)
+        summary.source_files_found = sum(1 for path in source_folder.expanduser().rglob("*") if path.is_file())
         metadata_by_path = read_metadata_batch_or_fallback(candidates, settings)
     except OSError as exc:
         logger.error(f"Startup failed: {exc}")
@@ -57,17 +60,45 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
         logger.warning("DRY_RUN is enabled; no files will be renamed")
         print()
 
+    hashes: dict[Path, str] = {}
+    for path in rename_candidates:
+        if classify(path, settings) == UNKNOWN:
+            continue
+        try:
+            hashes[path] = calculate_hash(path)
+        except OSError as exc:
+            summary.errors += 1
+            summary.error_files.append(f"{path} — {exc}")
+    counts = Counter(hashes.values())
+    summary.identical_groups = sum(count > 1 for count in counts.values())
+    normal_names = {
+        path: generate_filename(
+            metadata_by_path[path].selected_datetime, metadata_by_path[path].device_name,
+            digest, path, settings.filename_prefix, settings.hash_length,
+        ) for path, digest in hashes.items()
+    }
+    # Prefer existing normal names, then unlabelled files, then numbered copies.
+    rename_candidates.sort(key=lambda path: (
+        0 if path.name == normal_names.get(path) else (2 if re.search(r"_copy[0-9]+$", path.stem) else 1),
+        int(re.search(r"_copy([0-9]+)$", path.stem).group(1)) if re.search(r"_copy([0-9]+)$", path.stem) else 0,
+        metadata_by_path[path].selected_datetime, path.name.lower(), str(path),
+    ))
+    seen: Counter[str] = Counter()
+    reserved: set[Path] = set()
     for source_path in rename_candidates:
         try:
             media_type = classify(source_path, settings)
             if media_type == UNKNOWN:
                 summary.unknown_files += 1
+                summary.skipped_files.append(f"{source_path} — unsupported file type")
                 continue
 
             summary.media_files_processed += 1
             metadata = metadata_by_path[source_path]
             selected_datetime = metadata.selected_datetime
-            file_hash = calculate_hash(source_path)
+            if source_path not in hashes:
+                continue
+            file_hash = hashes[source_path]
             filename = generate_filename(
                 selected_datetime,
                 metadata.device_name,
@@ -76,8 +107,19 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
                 settings.filename_prefix,
                 settings.hash_length,
             )
+            duplicate = seen[file_hash] > 0
+            if duplicate:
+                base = Path(filename)
+                filename = f"{base.stem}_copy{seen[file_hash]}{base.suffix}"
+            seen[file_hash] += 1
             target_path = _rename_target(source_path, filename)
+            if target_path in reserved:
+                target_path = _available_target(source_path.with_name(filename), reserved)
+            reserved.add(target_path)
             if target_path == source_path:
+                summary.already_named += 1
+                if duplicate:
+                    summary.already_labelled_files.append(str(source_path))
                 logger.info(f"Already renamed: {source_path.name}")
                 continue
 
@@ -90,13 +132,14 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
                     taken_date=format_display_date(selected_datetime),
                     fingerprint=file_fingerprint(source_path, metadata),
                     collision=target_path.name != filename,
+                    duplicate=duplicate,
                 )
             )
             if target_path.name != filename:
-                summary.filename_collisions_handled += 1
                 logger.warning(f"Collision handled for {source_path.name}: {target_path.name}")
         except Exception as exc:
             summary.errors += 1
+            summary.error_files.append(f"{source_path} — {exc}")
             logger.error(f"Could not rename {source_path.name}: {exc}")
 
     if changes:
@@ -106,17 +149,38 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
     for change in changes:
         if settings.dry_run:
             summary.planned_copies += 1
+            if change.duplicate:
+                summary.labelled_files.append(f"{change.source_path} → {change.target_path}")
+            if change.collision:
+                summary.filename_collisions_handled += 1
+                summary.conflict_files.append(f"{change.source_path} → {change.target_path}")
             continue
         try:
             change.target_path.parent.mkdir(parents=True, exist_ok=True)
+            if change.target_path.exists():
+                raise FileExistsError(f"Target already exists: {change.target_path}")
             change.source_path.rename(change.target_path)
             summary.copied_files += 1
+            if change.duplicate:
+                summary.labelled_files.append(f"{change.source_path} → {change.target_path}")
+            if change.collision:
+                summary.filename_collisions_handled += 1
+                summary.conflict_files.append(f"{change.source_path} → {change.target_path}")
         except Exception as exc:
             summary.errors += 1
+            summary.error_files.append(f"{change.source_path} — {exc}")
             logger.error(f"Could not rename {change.old_name}: {exc}")
 
     summary.print()
     return 0 if summary.errors == 0 else 1
+
+
+def _available_target(target_path: Path, reserved: set[Path]) -> Path:
+    for number in range(1, 10_000):
+        candidate = target_path.with_name(f"{target_path.stem}_collision-{number:02d}{target_path.suffix}")
+        if not candidate.exists() and candidate not in reserved:
+            return candidate
+    raise RuntimeError(f"No available filename for {target_path}")
 
 
 def _rename_target(source_path: Path, filename: str) -> Path:

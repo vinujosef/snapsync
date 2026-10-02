@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import hashlib
+import os
 import re
 import unittest
 
@@ -172,6 +173,48 @@ class RenameMediaTests(unittest.TestCase):
             first_row = next(line for line in text.splitlines() if line.strip().startswith("1"))
             second_row = next(line for line in text.splitlines() if line.strip().startswith("2"))
             self.assertLess(text.index(first_row), text.index(second_row))
+
+    def test_duplicate_labels_are_stable_and_dry_run_preserves_source(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for name in ("A.jpg", "B.jpg", "C.jpg"):
+                (root / name).write_bytes(b"same photo")
+            (root / ".hidden").write_bytes(b"hidden")
+            (root / "notes.txt").write_text("notes")
+
+            def metadata(paths, settings):
+                return {path: Metadata(
+                    selected_datetime=datetime(2026, 5, 18, 14, 22, 11),
+                    timestamp_field="DateTimeOriginal", device_name="Camera",
+                    quality="metadata", timezone_offset="+03:00",
+                ) for path in paths}
+
+            with (
+                patch("snapsync.actions.rename_media.read_metadata_batch_or_fallback", side_effect=metadata),
+                patch("shutil.get_terminal_size", return_value=os.terminal_size((260, 24))),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", return_value="yes"),
+            ):
+                with redirect_stdout(StringIO()) as preview:
+                    self.assertEqual(run_media_rename(root, _settings(root, dry_run=True)), 0)
+                self.assertTrue((root / "A.jpg").exists())
+                self.assertIn("Files To Receive Extra Label", preview.getvalue())
+                with redirect_stdout(StringIO()) as output:
+                    self.assertEqual(run_media_rename(root, _settings(root, dry_run=False)), 0)
+                names = sorted(path.name for path in root.glob("*.jpg"))
+                self.assertEqual(len(names), 3)
+                self.assertEqual(sum("_copy" in name for name in names), 2)
+                self.assertTrue(any("_copy1.jpg" in name for name in names))
+                self.assertTrue(any("_copy2.jpg" in name for name in names))
+                self.assertIn("notes.txt — unsupported file type", output.getvalue())
+                self.assertIn("Set of Identical Files", output.getvalue())
+                with redirect_stdout(StringIO()) as repeat:
+                    self.assertEqual(run_media_rename(root, _settings(root, dry_run=False)), 0)
+                self.assertEqual(names, sorted(path.name for path in root.glob("*.jpg")))
+                text = _compact(_strip_colors(repeat.getvalue()))
+                self.assertIn("Files Receiving Extra Label Due to Duplication 0", text)
+                self.assertIn("Files Which Already Had Received Extra Label Due to Duplication 2", text)
+                self.assertFalse((root / "_snapsync_reports").exists())
 
     def test_rename_requires_yes_before_scanning_or_changing_files(self):
         with TemporaryDirectory() as temp_dir:

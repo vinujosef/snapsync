@@ -8,6 +8,7 @@ import builtins
 import re
 import shutil
 import sys
+import textwrap
 
 try:
     from rich import box
@@ -309,3 +310,37 @@ def format_display_date(value: date | datetime) -> str:
 
 def format_display_datetime(value: datetime) -> str:
     return value.strftime(DISPLAY_DATETIME_FORMAT)
+
+
+def print_summary_table(sections: list[tuple[str, str, list[tuple[str, int, str]]]]) -> None:
+    """Render summary sections with wrapped file lists and right-aligned counts."""
+    width = max(40, shutil.get_terminal_size(fallback=(160, 24)).columns)
+    if _rich_enabled():
+        table = Table(box=box.SIMPLE_HEAD, header_style="bold cyan", width=width, padding=(0, 1))
+        table.add_column("Description", ratio=2, overflow="fold")
+        table.add_column("Count", width=5, justify="right", no_wrap=True)
+        table.add_column("Notes/Files", ratio=3, overflow="fold")
+        for index, (title, note, rows) in enumerate(sections):
+            if index:
+                table.add_section()
+            table.add_row(Text(title, style="bold cyan"), "", Text(note, style="cyan"))
+            for label, count, notes in rows:
+                table.add_row(Text(label), str(count), Text(notes))
+        _console().print(table)
+        return
+
+    available = width - 9
+    widths = [max(10, available * 2 // 5), 5, available - max(10, available * 2 // 5)]
+    _emit(format_table_row(["Description", "Count", "Notes/Files"], widths, header=True))
+    for title, note, rows in sections:
+        _emit(format_table_separator(widths))
+        for label, count, notes in [(title, "", note), *rows]:
+            values = [label, str(count), notes]
+            wrapped = [
+                [part for line in value.split("\n") for part in (textwrap.wrap(line, widths[index]) or [""])]
+                for index, value in enumerate(values)
+            ]
+            for line_index in range(max(map(len, wrapped))):
+                cells = [lines[line_index] if line_index < len(lines) else "" for lines in wrapped]
+                cells[1] = cells[1].rjust(widths[1])
+                _emit(format_table_row(cells, widths))

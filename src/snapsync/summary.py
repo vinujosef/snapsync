@@ -11,6 +11,7 @@ from snapsync.util.console import (
     print_key_values,
     print_section_heading,
     print_title,
+    print_summary_table,
 )
 
 
@@ -31,10 +32,49 @@ class RunSummary:
     audit_mode: bool = False
     action_label: str = "copy"
 
+    already_named: int = 0
+    identical_groups: int = 0
+    labelled_files: list[str] = field(default_factory=list)
+    already_labelled_files: list[str] = field(default_factory=list)
+    skipped_files: list[str] = field(default_factory=list)
+    error_files: list[str] = field(default_factory=list)
+    conflict_files: list[str] = field(default_factory=list)
+
+    def _print_rename_summary(self) -> None:
+        print_title("snapsync - Rename Summary", icon=ICONS["app"])
+        renamed = "Will Rename (during this run)" if self.audit_mode else "Renamed (during this run)"
+        label = "Files To Receive Extra Label Due to Duplication" if self.audit_mode else "Files Receiving Extra Label Due to Duplication"
+        conflict = "Filename Conflict To Fix (name already being occupied)" if self.audit_mode else "Filename Conflict Fixed (name already being occupied)"
+        bullets = lambda values: "\n".join(f"• {value}" for value in values)
+        sections = [
+            ("1️⃣  Scanned", "", [
+                ("Files Found (media files, hidden files, system files, ignored files)", self.source_files_found, ""),
+                ("Media Files (photos, videos)", self.media_files_processed, ""),
+            ]),
+            ("2️⃣  Results", "", [
+                (renamed, self.planned_copies if self.audit_mode else self.copied_files, ""),
+                ("Already Correctly Named (before this run)", self.already_named, ""),
+                ("Skipped Unknown", self.unknown_files, bullets(self.skipped_files)),
+                ("Errors", self.errors, bullets(self.error_files)),
+            ]),
+            ("3️⃣  Duplicate Details", "_copyN means identical content", [
+                ("Set of Identical Files", self.identical_groups, ""),
+                (label, len(self.labelled_files), bullets(self.labelled_files)),
+                ("Files Which Already Had Received Extra Label Due to Duplication", len(self.already_labelled_files), bullets(self.already_labelled_files)),
+            ]),
+            ("4️⃣  Filename Conflict", "", [
+                (conflict, self.filename_collisions_handled, bullets(self.conflict_files)),
+            ]),
+        ]
+        print_summary_table(sections)
+
     def record_output_folder(self, media_type: str, destination: Path) -> None:
         self.output_folders.setdefault(media_type, set()).add(destination.parent)
 
     def print(self) -> None:
+        if self.action_label == "rename":
+            self._print_rename_summary()
+            return
         sections = [
             (
                 "Scanned",
@@ -89,12 +129,16 @@ class RunSummary:
             rows.append(("Filename conflicts fixed", self.filename_collisions_handled, THEME.warning))
         return rows
 
-    def _print_section(self, title: str, rows: list[tuple[str, object, str]]) -> None:
+    def _print_section(self, title: str, rows: list[tuple[str, object, str]], details: dict[str, list[str]] | None = None, note: str | None = None) -> None:
         print_section_heading(title)
+        if note:
+            print(note)
         label_width = max(len(label) for label, _, _ in rows)
         value_width = max(len(str(value)) for _, value, _ in rows)
         for label, value, color in rows:
             print_key_values([(label.ljust(label_width), str(value).rjust(value_width))], value_color=color)
+            for detail in (details or {}).get(label, []):
+                print(f"  • {detail}")
 
     def _print_output_folders(self) -> None:
         if not self.output_folders:

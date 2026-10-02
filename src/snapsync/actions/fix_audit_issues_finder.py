@@ -44,12 +44,17 @@ class FileCreateDateFix:
     image_height: int | None = None
 
 
-def timezone_fixes(candidates: list[Path], metadata_by_path: dict[Path, Metadata]) -> list[TimezoneFix]:
+def timezone_fixes(
+    candidates: list[Path],
+    metadata_by_path: dict[Path, Metadata],
+    *,
+    include_all: bool = False,
+) -> list[TimezoneFix]:
     fixes: list[TimezoneFix] = []
 
     for path in candidates:
         metadata = metadata_by_path[path]
-        if "timezone" not in metadata_warnings(metadata):
+        if not include_all and "timezone" not in metadata_warnings(metadata):
             continue
 
         # Store everything the preview needs so the prompt layer stays simple.

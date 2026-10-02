@@ -15,6 +15,80 @@ from snapsync.util.console import RESET, YELLOW
 
 
 class FixAuditIssuesTests(unittest.TestCase):
+    def test_custom_timezone_applies_to_all_scanned_files(self):
+        for dry_run, confirmation in [(False, "yes"), (True, "yes"), (False, "no")]:
+            with self.subTest(dry_run=dry_run, confirmation=confirmation), TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                files = [root / "matching.JPG", root / "missing.JPG", root / "different.JPG"]
+                for photo in files:
+                    photo.write_bytes(b"photo")
+                capture_time = datetime(2026, 7, 1, 10, 0, 0)
+                metadata_by_path = {
+                    photo: Metadata(
+                        selected_datetime=capture_time,
+                        timestamp_field="DateTimeOriginal",
+                        device_name="iPhone",
+                        quality="metadata",
+                        timezone_offset=offset,
+                    )
+                    for photo, offset in zip(files, ["+03:00", None, "-04:00"])
+                }
+                output = StringIO()
+                with (
+                    patch("snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback", return_value=metadata_by_path),
+                    patch("sys.stdin.isatty", return_value=True),
+                    patch("builtins.input", side_effect=["3", "4", "+05:30", confirmation]),
+                    patch("snapsync.actions.fix_audit_issues_prompts.write_timezone_offset") as write,
+                    patch("snapsync.actions.fix_audit_issues_prompts.verify_timezone_offset") as verify,
+                    redirect_stdout(output),
+                ):
+                    result = run_audit_issue_fix(root, _settings(root, dry_run=dry_run))
+                self.assertEqual(result, 0)
+                expected_count = 3 if not dry_run and confirmation == "yes" else 0
+                self.assertEqual(write.call_count, expected_count)
+                self.assertEqual(verify.call_count, expected_count)
+                self.assertEqual({call.args[0] for call in write.call_args_list}, set(files) if expected_count else set())
+                for call in write.call_args_list:
+                    self.assertEqual(call.args[1], "+05:30")
+                self.assertIn("Recorded date and clock time stay unchanged", output.getvalue())
+
+    def test_custom_timezone_available_without_audit_issues(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "photo.JPG"
+            photo.write_bytes(b"photo")
+            metadata = Metadata(
+                selected_datetime=datetime(2026, 7, 1, 10, 0, 0),
+                timestamp_field="DateTimeOriginal", device_name="iPhone",
+                quality="metadata", timezone_offset="+03:00",
+            )
+            with (
+                patch("snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback", return_value={photo: metadata}),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["3", "4", "+05:30", "yes"]),
+                patch("snapsync.actions.fix_audit_issues_prompts.write_timezone_offset") as write,
+                patch("snapsync.actions.fix_audit_issues_prompts.verify_timezone_offset"),
+                redirect_stdout(StringIO()),
+            ):
+                settings = _settings(root, dry_run=False)
+                self.assertEqual(run_audit_issue_fix(root, settings), 0)
+            write.assert_called_once_with(photo, "+05:30", settings)
+
+    def test_custom_timezone_rejects_invalid_offset(self):
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            photo = root / "photo.JPG"
+            photo.write_bytes(b"photo")
+            with (
+                patch("snapsync.actions.fix_audit_issues.read_metadata_batch_or_fallback", return_value={photo: _metadata_with_timezone_issue(datetime(2026, 7, 1))}),
+                patch("sys.stdin.isatty", return_value=True),
+                patch("builtins.input", side_effect=["3", "4", "+25:00"]),
+                patch("snapsync.actions.fix_audit_issues_prompts.write_timezone_offset") as write,
+                redirect_stdout(StringIO()),
+            ):
+                self.assertEqual(run_audit_issue_fix(root, _settings(root, dry_run=False)), 1)
+            write.assert_not_called()
+
     def test_fixes_timezone_offsets_after_confirmation(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

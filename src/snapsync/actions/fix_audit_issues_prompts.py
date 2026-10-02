@@ -53,6 +53,7 @@ class TimezoneFixSelection:
     preview_step_count: str = "2 of 3"
     confirmation_marker: str = "iii."
     confirmation_step_count: str = "3 of 3"
+    custom_offset: str | None = None
 
 
 ROOT_PATH = ("snapsync",)
@@ -93,16 +94,25 @@ def print_issue_menu(
     print("Choose repair:")
 
 
-def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int:
+def run_timezone_offset_fix(
+    fixes: list[TimezoneFix],
+    settings: Settings,
+    *,
+    all_files: list[TimezoneFix] | None = None,
+) -> int:
     path = (*FIX_AUDIT_PATH, "Fix timezone mismatch")
     _print_workflow_header(path)
     print_section_heading("Timezone Offset Fix", icon=ICONS["fix"])
     _print_dry_run_notice(settings)
-    if not fixes:
+    if not fixes and not all_files:
         print("No timezone offsets need fixing.")
         return 0
 
-    selection = _choose_timezone_offset_fixes(fixes, path)
+    try:
+        selection = _choose_timezone_offset_fixes(fixes, path, all_files=all_files)
+    except ValueError as exc:
+        logger.error(str(exc))
+        return 1
     if selection is None:
         logger.info("No timezone offset fix mode selected")
         return 0
@@ -117,7 +127,11 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
         path=path,
         step_count=selection.preview_step_count,
     )
-    _print_timezone_rules(selected_fixes)
+    if selection.custom_offset is None:
+        _print_timezone_rules(selected_fixes)
+    else:
+        print_key_values([("Custom offset", selection.custom_offset)])
+        print("Recorded date and clock time stay unchanged.")
     print()
     rows = [
         [
@@ -176,11 +190,14 @@ def run_timezone_offset_fix(fixes: list[TimezoneFix], settings: Settings) -> int
 def _choose_timezone_offset_fixes(
     fixes: list[TimezoneFix],
     path: tuple[str, ...],
+    *,
+    all_files: list[TimezoneFix] | None = None,
 ) -> TimezoneFixSelection | None:
     _print_step("i.", "Choose timezone offset fix mode", path=path, step_count="1 of 3")
     print("1. Set only files with offset (none) to Helsinki timezone for each file date")
     print("2. Set only files with offset (none) to a custom offset")
     print("3. Change all timezone audit matches to Helsinki timezone")
+    print("4. Set all scanned files to a custom offset (keep date and clock time)")
     print()
     print("b. Back")
     print("q. Quit")
@@ -189,21 +206,27 @@ def _choose_timezone_offset_fixes(
     choice = input("> ").strip().lower()
     if choice == "1":
         return TimezoneFixSelection(_missing_offset_fixes(fixes))
-    if choice == "2":
+    if choice in {"2", "4"}:
         custom_offset = _step_input(
             "ii.",
-            "Custom offset for files with offset (none) (+HH:MM or -HH:MM)",
+            ("Custom offset for all scanned files (+HH:MM or -HH:MM)"
+             if choice == "4" else "Custom offset for files with offset (none) (+HH:MM or -HH:MM)"),
             path=path,
             step_count="2 of 4",
         )
         if parse_timezone_offset_minutes(custom_offset) is None:
             raise ValueError("custom offset must use +HH:MM or -HH:MM")
         return TimezoneFixSelection(
-            [replace(fix, expected_offset=custom_offset) for fix in _missing_offset_fixes(fixes)],
+            [
+                replace(fix, expected_offset=custom_offset)
+                for fix in ((all_files if all_files is not None else fixes)
+                            if choice == "4" else _missing_offset_fixes(fixes))
+            ],
             preview_marker="iii.",
             preview_step_count="3 of 4",
             confirmation_marker="iv.",
             confirmation_step_count="4 of 4",
+            custom_offset=custom_offset,
         )
     if choice == "3":
         return TimezoneFixSelection(fixes)

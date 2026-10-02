@@ -63,6 +63,10 @@ q. Quit
   Repairs selected metadata issues after a preview and confirmation.
   Available fixes include timezone offset, unknown device, one-file manual
   edits, bulk repairs, and batch repairs.
+  Under `3` Fix timezone mismatch or missing offset, choose `4` to set all
+  scanned files to a custom offset such as `+05:30`, including files without
+  audit issues or an existing offset. This keeps the recorded date and clock
+  time unchanged and requires preview confirmation.
   Preview tables show old/current values in red and new values in green.
   After confirmed fixes, snapsync prints a full metadata result table and
   highlights the changed final value in yellow.

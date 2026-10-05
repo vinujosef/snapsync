@@ -150,7 +150,7 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
         if settings.dry_run:
             summary.planned_copies += 1
             if change.duplicate:
-                summary.labelled_files.append(f"{change.source_path} → {change.target_path}")
+                summary.labelled_files.append(f"{change.old_name} → {change.new_name}")
             if change.collision:
                 summary.filename_collisions_handled += 1
                 summary.conflict_files.append(f"{change.source_path} → {change.target_path}")
@@ -162,7 +162,7 @@ def run_media_rename(source_folder: Path, settings: Settings) -> int:
             change.source_path.rename(change.target_path)
             summary.copied_files += 1
             if change.duplicate:
-                summary.labelled_files.append(f"{change.source_path} → {change.target_path}")
+                summary.labelled_files.append(f"{change.old_name} → {change.new_name}")
             if change.collision:
                 summary.filename_collisions_handled += 1
                 summary.conflict_files.append(f"{change.source_path} → {change.target_path}")
